@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import settings
+from app.core.exceptions import DatabaseUnavailable
 from app.modules.auth.router import router as auth_router
 from app.modules.menu.service import MenuService
 
@@ -24,15 +25,19 @@ async def index(request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     # Placeholder: aquí luego renderizamos el menú dinámico y el selector de compañía.
-        menu_map = user.get("menu_map")
-        menu = []
-        if menu_map:
+    menu_map = user.get("menu_map")
+    menu = []
+    if menu_map:
+        try:
             menu = MenuService().build_menu(str(menu_map))
+        except Exception:
+            # Si falla el menú, mostramos menú vacío
+            menu = []
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "user": user,
-                "menu": menu,
+            "menu": menu,
         },
     )

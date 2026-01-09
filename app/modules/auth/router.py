@@ -47,7 +47,23 @@ def login_post(
 ):
     service = AuthService()
 
-    user = service.authenticate(username=username, password=password, company_code=company_code)
+    try:
+        user = service.authenticate(username=username, password=password, company_code=company_code)
+    except DatabaseUnavailable as e:
+        try:
+            companies = service.list_companies()
+        except DatabaseUnavailable:
+            companies = []
+        return templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "companies": companies,
+                "error": str(e),
+            },
+            status_code=503,
+        )
+
     if not user:
         try:
             companies = service.list_companies()

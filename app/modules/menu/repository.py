@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.session import session_for
+from app.core.exceptions import DatabaseUnavailable
 
 
 class MenuRepository:
@@ -19,9 +21,12 @@ class MenuRepository:
             ORDER BY mmn_modulo ASC
             """
         )
-        with session_for(db_name) as s:
-            rows = s.execute(sql, {"menu_map": menu_map}).all()
-            return [str(r[0]) for r in rows if r and r[0] is not None]
+        try:
+            with session_for(db_name) as s:
+                rows = s.execute(sql, {"menu_map": menu_map}).all()
+                return [str(r[0]) for r in rows if r and r[0] is not None]
+        except SQLAlchemyError as e:
+            raise DatabaseUnavailable("Error al cargar módulos del menú.") from e
 
     def load_module_menu(self, db_name: str, module_name: str, menu_map: str) -> list[dict]:
         # Replica del C# Compania.cargarMenuPrincipal(nombreMenu, mapaMenu)
@@ -43,9 +48,12 @@ class MenuRepository:
             ORDER BY menu_subpadre ASC, menu_hijo ASC
             """
         )
-        with session_for(db_name) as s:
-            rows = s.execute(
-                sql,
-                {"module_name": module_name, "menu_map": menu_map},
-            ).mappings().all()
-            return [dict(r) for r in rows]
+        try:
+            with session_for(db_name) as s:
+                rows = s.execute(
+                    sql,
+                    {"module_name": module_name, "menu_map": menu_map},
+                ).mappings().all()
+                return [dict(r) for r in rows]
+        except SQLAlchemyError as e:
+            raise DatabaseUnavailable("Error al cargar items del menú.") from e

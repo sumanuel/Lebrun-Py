@@ -19,7 +19,7 @@
     {% for g in m.groups %}
     <h4>{{ g.name }}</h4>
     <ul>
-      {% for it in g.items %}
+      {% for it in g['items'] %}
       <li>
         {{ it.label }} {% if it.route %}
         <small>({{ it.route }})</small>

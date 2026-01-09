@@ -79,9 +79,9 @@ class AuthRepository:
                 row = s.execute(sql, {"user_id": user_id}).mappings().first()
                 if not row or row["usu_administracion"] is None:
                     return False
-                    allowed = str(row["usu_administracion"]).split("-")
+                allowed = str(row["usu_administracion"]).split("-")
                 return company_code in allowed
         except SQLAlchemyError as e:
             raise DatabaseUnavailable(
-                    "No se pudo validar permisos de compañía. Revisa acceso a la BD 'sysconf'."
+                "No se pudo validar permisos de compañía. Revisa acceso a la BD 'sysconf'."
             ) from e
