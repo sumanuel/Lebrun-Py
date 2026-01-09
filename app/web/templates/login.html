@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Login - Lebrun</title>
+  </head>
+  <body>
+    <h1>Login</h1>
+
+    {% if error %}
+        <label>Contraseña</label>
+        <input type="password" name="password" autocomplete="current-password" />
+        <input name="username" autocomplete="username" />
+      </div>
+        <label>Compañía</label>
+          <label>Contraseña</label>
+        <input
+          type="password"
+          <label>Compañía</label>
+          autocomplete="current-password"
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Login - Lebrun</title>
+          </head>
+          <body>
+            <h1>Login</h1>
+
+            {% if error %}
+              <p style="color: red">{{ error }}</p>
+            {% endif %}
+
+            <form method="post" action="/login">
+              <div>
+                <label>Usuario</label>
+                <input name="username" autocomplete="username" />
+              </div>
+
+              <div>
+                <label>Contraseña</label>
+                <input type="password" name="password" autocomplete="current-password" />
+              </div>
+
+              <div>
+                <label>Compañía</label>
+                <select name="company_code">
+                  {% for c in companies %}
+                    <option value="{{ c.empre_codigo }}" {% if c.empre_actual %}selected{% endif %}>
+                      {{ c.empre_nombre }} ({{ c.empre_codigo }})
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <button type="submit">Entrar</button>
+            </form>
+          </body>
+        </html>

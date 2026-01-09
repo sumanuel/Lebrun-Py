@@ -1,0 +1,1 @@
+# Módulo Vendedores (placeholder)

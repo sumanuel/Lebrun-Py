@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Principal - Lebrun</title>
+  </head>
+  <body>
+    <h1>Principal</h1>
+
+    <p>Usuario: {{ user.username }}</p>
+
+    <form method="post" action="/logout">
+      <button type="submit">Salir</button>
+    </form>
+
+    <h2>Menú</h2>
+    {% if menu and menu|length > 0 %} {% for m in menu %}
+    <h3>{{ m.module }}</h3>
+    {% for g in m.groups %}
+    <h4>{{ g.name }}</h4>
+    <ul>
+      {% for it in g.items %}
+      <li>
+        {{ it.label }} {% if it.route %}
+        <small>({{ it.route }})</small>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endfor %} {% endfor %} {% else %}
+    <p>No hay opciones de menú para este usuario.</p>
+    {% endif %}
+  </body>
+</html>
