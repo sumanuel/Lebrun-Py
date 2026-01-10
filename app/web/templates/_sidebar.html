@@ -1,0 +1,33 @@
+{% if menu and menu|length > 0 %} {% for m in menu %}
+<div class="menu__section" data-module="{{ m.module|lower }}">
+  <button class="menu__section-title" type="button" data-accordion>
+    <span class="menu__section-text">{{ m.module }}</span>
+    <span class="menu__chev">▾</span>
+  </button>
+
+  <div class="menu__section-body">
+    {% for g in m.groups %}
+    <div class="menu__group" data-group="{{ g.name|lower }}">
+      <div class="menu__group-title">{{ g.name }}</div>
+      <ul class="menu__list">
+        {% for it in g['items'] %}
+        <li class="menu__item" data-label="{{ it.label|lower }}">
+          {% if it.href %}
+          <a
+            class="menu__link {% if active_href and it.href == active_href %}is-active{% endif %}"
+            href="{{ it.href }}"
+            >{{ it.label }}</a
+          >
+          {% else %}
+          <span class="menu__link menu__link--disabled">{{ it.label }}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %} {% else %}
+<div class="empty">No hay opciones de menú para este usuario.</div>
+{% endif %}

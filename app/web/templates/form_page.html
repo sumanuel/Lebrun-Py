@@ -1,0 +1,25 @@
+{% extends "base.html" %} {% block page_title %} {{ page_title }} {% endblock %}
+{% block sidebar %} {% include "_sidebar.html" %} {% endblock %} {% block
+content %}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">{{ page_title }}</div>
+      <div class="card__body">
+        <p class="muted">{{ description }}</p>
+
+        <div class="code">Ruta: {{ request.url.path }}</div>
+
+        <p class="muted">
+          Próximo paso: conectar repositorios/servicios del módulo y reemplazar
+          esta UI inicial por la pantalla real.
+        </p>
+
+        <div class="actions">
+          <a class="btn btn--ghost" href="/">Inicio</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

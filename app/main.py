@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import quote_plus
+
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,6 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import settings
 from app.core.exceptions import DatabaseUnavailable
 from app.modules.auth.router import router as auth_router
+from app.modules.forms.router import router as forms_router
 from app.modules.menu.service import MenuService
 
 app = FastAPI(title="Lebrun-Py")
@@ -20,6 +23,7 @@ static_dir = settings.templates_dir.parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 app.include_router(auth_router)
+app.include_router(forms_router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -68,6 +72,7 @@ async def open_form(request: Request, form: str = Query("")):
             "request": request,
             "user": user,
             "menu": menu,
+            "active_href": f"/open?form={quote_plus(form)}" if form else None,
             "form": form,
             "title": f"{form} - Lebrun" if form else "Lebrun",
         },
