@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Lebrun" }}</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell {% if hide_nav %}app-shell--no-nav{% endif %}">
+      {% if not hide_nav %}
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar__header">
+          <div class="brand">
+            <div class="brand__mark">L</div>
+            <div class="brand__text">
+              <div class="brand__title">Lebrun</div>
+              <div class="brand__subtitle">Web</div>
+            </div>
+          </div>
+
+          <button
+            class="icon-btn"
+            type="button"
+            id="sidebarToggle"
+            aria-label="Contraer menú"
+          >
+            <span class="icon">≡</span>
+          </button>
+        </div>
+
+        <div class="sidebar__search">
+          <input
+            id="menuSearch"
+            class="input"
+            type="search"
+            placeholder="Buscar opción…"
+            autocomplete="off"
+          />
+        </div>
+
+        <nav class="menu" id="menu">{% block sidebar %}{% endblock %}</nav>
+
+        <div class="sidebar__footer">
+          <div class="meta">
+            <div class="meta__row">
+              <span class="meta__label">Usuario</span>
+              <span class="meta__value">{{ user.username }}</span>
+            </div>
+            {% if request.session.get('company_code') %}
+            <div class="meta__row">
+              <span class="meta__label">Compañía</span>
+              <span class="meta__value"
+                >{{ request.session.get('company_code') }}</span
+              >
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </aside>
+      {% endif %}
+
+      <main class="main">
+        {% if not hide_nav %}
+        <header class="topbar">
+          <div class="topbar__left">
+            <div class="page-title">{% block page_title %}{% endblock %}</div>
+          </div>
+          <div class="topbar__right">
+            <form method="post" action="/logout">
+              <button class="btn btn--ghost" type="submit">Salir</button>
+            </form>
+          </div>
+        </header>
+        {% endif %}
+
+        <section class="content">{% block content %}{% endblock %}</section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

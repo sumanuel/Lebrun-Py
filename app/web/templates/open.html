@@ -1,5 +1,7 @@
-{% extends "base.html" %} {% block page_title %} Panel principal {% endblock %}
-{% block sidebar %} {% if menu and menu|length > 0 %} {% for m in menu %}
+{% extends "base.html" %} {% block page_title %} {{ form or "Pantalla" }} {%
+endblock %} {% block sidebar %} {# Reutiliza el mismo sidebar del index (lo
+inyecta el router que renderiza esta página). #} {% if menu and menu|length > 0
+%} {% for m in menu %}
 <div class="menu__section" data-module="{{ m.module|lower }}">
   <button class="menu__section-title" type="button" data-accordion>
     <span class="menu__section-text">{{ m.module }}</span>
@@ -14,7 +16,11 @@
         {% for it in g['items'] %}
         <li class="menu__item" data-label="{{ it.label|lower }}">
           {% if it.href %}
-          <a class="menu__link" href="{{ it.href }}">{{ it.label }}</a>
+          <a
+            class="menu__link {% if it.route == form %}is-active{% endif %}"
+            href="{{ it.href }}"
+            >{{ it.label }}</a
+          >
           {% else %}
           <span class="menu__link menu__link--disabled">{{ it.label }}</span>
           {% endif %}
@@ -28,18 +34,20 @@
 {% endfor %} {% else %}
 <div class="empty">No hay opciones de menú para este usuario.</div>
 {% endif %} {% endblock %} {% block content %}
-<div class="grid">
-  <div class="col-12">
-    <div class="card">
-      <div class="card__title">Bienvenido, {{ user.username }}</div>
-      <div class="card__body">
-        <p class="muted">Selecciona una opción del menú para continuar.</p>
-        {% if request.session.get('company_code') %}
-        <div class="code">
-          Compañía activa: {{ request.session.get('company_code') }}
-        </div>
-        {% endif %}
-      </div>
+<div class="card">
+  <div class="card__title">En construcción</div>
+  <div class="card__body">
+    <p>
+      Esta opción viene de tu mapa de menú (conf_menu / confmapamenu), pero
+      todavía no está migrada a web.
+    </p>
+    <div class="code">{{ form }}</div>
+    <p class="muted">
+      Siguiente paso: mapear este identificador a una ruta/vista real del módulo
+      correspondiente.
+    </p>
+    <div class="actions">
+      <a class="btn" href="/">Volver al inicio</a>
     </div>
   </div>
 </div>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from urllib.parse import quote_plus
 
 from app.core.config import settings
 from app.modules.menu.repository import MenuRepository
@@ -34,10 +35,17 @@ class MenuService:
 
             for row in items:
                 group_name = str(row.get("subpadre") or "General")
+                route = str(row.get("mmn_formulario") or "")
+                href = None
+                if route:
+                    # En WinForms el "formulario" es una clase/identificador.
+                    # En web lo mapeamos a una pantalla placeholder; luego se enruta a vistas reales.
+                    href = f"/open?form={quote_plus(route)}"
                 grouped[group_name].append(
                     {
                         "label": str(row.get("menu_nombre") or row.get("hijo") or "(sin nombre)"),
-                        "route": str(row.get("mmn_formulario") or ""),
+                        "route": route,
+                        "href": href,
                     }
                 )
 
