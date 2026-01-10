@@ -11,6 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import settings
 from app.core.exceptions import DatabaseUnavailable
 from app.modules.auth.router import router as auth_router
+from app.modules.fiscal.router import router as fiscal_router
 from app.modules.forms.router import router as forms_router
 from app.modules.menu.service import MenuService
 
@@ -24,6 +25,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 app.include_router(auth_router)
 app.include_router(forms_router)
+app.include_router(fiscal_router)
 
 
 @app.get("/", response_class=HTMLResponse)

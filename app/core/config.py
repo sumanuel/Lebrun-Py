@@ -31,6 +31,9 @@ class Settings:
 
     secret_key: str = _env("SECRET_KEY", "change-me")
 
+    fiscal_agent_token: str = _env("LEBRUN_FISCAL_AGENT_TOKEN", "")
+    fiscal_jobs_path: Path = Path(_env("LEBRUN_FISCAL_JOBS_PATH", str(PROJECT_ROOT / "data" / "fiscal_jobs.json")))
+
     templates_dir: Path = PROJECT_ROOT / "app" / "web" / "templates"
 
 

@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from app.core.config import settings
 from app.core.exceptions import DatabaseUnavailable
 from app.modules.facturacion.repository import FacturacionRepository
+from app.modules.fiscal.service import FiscalService
 from app.modules.menu.service import MenuService
 from app.modules.ventas.repository import VentasRepository
 
@@ -180,10 +181,16 @@ def facturacion_reportes_zx_post(request: Request, action: str = Form("")):
         request.session["flash"] = "Acción inválida."
         return RedirectResponse(url="/facturacion/reportes/zx", status_code=303)
 
-    # Stub seguro: solo registra la intención.
-    request.session["flash"] = (
-        f"Orden registrada: Reporte {action}. Próximo paso: integrar servicio local/impresora fiscal."
-    )
+    caja = user.get("caja")
+    try:
+        job_id = FiscalService().enqueue_report(
+            caja=str(caja) if caja is not None else None,
+            report_type=action,
+            requested_by=str(user.get("username") or ""),
+        )
+        request.session["flash"] = f"Orden encolada: Reporte {action}. Job: {job_id}"
+    except Exception as e:
+        request.session["flash"] = f"No se pudo encolar el reporte: {e}"
     return RedirectResponse(url="/facturacion/reportes/zx", status_code=303)
 
 
