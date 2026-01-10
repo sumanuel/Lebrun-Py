@@ -8,6 +8,8 @@ from datetime import datetime
 
 import requests
 
+from tfhka_driver import TfhkaError, print_report_xz
+
 
 def _env(name: str, default: str | None = None) -> str:
     val = os.getenv(name, default)
@@ -49,6 +51,30 @@ def execute_job_stub(job: dict) -> None:
             raise RuntimeError(f"Reporte inválido: {report}")
         log(f"[STUB] Ejecutando reporte {report} para caja={caja} payload={json.dumps(payload, ensure_ascii=False)}")
         time.sleep(1.0)
+        return
+
+    raise RuntimeError(f"Job type no soportado: {job_type}")
+
+
+def execute_job(job: dict) -> None:
+    job_type = str(job.get("job_type") or "")
+    payload = job.get("payload") or {}
+    caja = job.get("caja")
+
+    # Modo explícito: stub (útil para demos sin impresora)
+    mode = (os.getenv("LEBRUN_FISCAL_MODE") or "").strip().lower()
+    if mode in {"stub", "simulate", "sim"}:
+        return execute_job_stub(job)
+
+    if job_type == "REPORT_ZX":
+        report = str(payload.get("report") or "").upper()
+        com_port = os.getenv("LEBRUN_FISCAL_COM_PORT")
+        dll_path = os.getenv("LEBRUN_TFHKA_DLL_PATH")
+
+        log(
+            f"Ejecutando TFHKA reporte {report} caja={caja} com={com_port or '(sin COM)'} dll={(dll_path or '').strip() or '(sin dll)'}"
+        )
+        print_report_xz(report=report, com_port=str(com_port or ""), dll_path=str(dll_path or ""))
         return
 
     raise RuntimeError(f"Job type no soportado: {job_type}")
@@ -99,7 +125,7 @@ def main() -> int:
                 log(f"Job recibido: {job_id} type={job.get('job_type')} caja={job.get('caja')}")
 
                 try:
-                    execute_job_stub(job)
+                    execute_job(job)
                 except Exception as e:
                     err = str(e)
                     log(f"ERROR ejecutando job {job_id}: {err}")

@@ -59,7 +59,15 @@ MAPPINGS: tuple[FormMapping, ...] = (
         title="Visor de Precios",
         path="/ventas/visor-precios",
         description="Consulta rápida de artículos/precios (versión web inicial).",
-        aliases=("frmConsultaArticulos", "Visor"),
+        aliases=(
+            "frmConsultaArticulos",
+            "Visor",
+            # Identificadores encontrados en BD de algunos clientes
+            "frmVisor2",
+            "lbxVisor3",
+            "lebrun.formularios.productos.frmVisor2",
+            "lebrun.formularios.productos.lbxVisor3",
+        ),
     ),
     FormMapping(
         key="lebrun.formularios.facturacion.ReportesZ_X",

@@ -62,4 +62,7 @@ Luego el cliente navega a: `http://IP_DEL_SERVIDOR:8000`
 
 - `LEBRUN_FISCAL_AGENT_TOKEN` debe ser el mismo en servidor y agente.
 - Recomendado: **un servicio por caja** (filtrado con `LEBRUN_FISCAL_CAJA`).
-- La integración real TFHKA/COM se implementa dentro de `fiscal-agent/agent.py` (por ahora es stub).
+- En la PC fiscal, configurar en `fiscal-agent\agent.env`:
+  - `LEBRUN_FISCAL_COM_PORT` (ej: `COM3`)
+  - `LEBRUN_TFHKA_DLL_PATH` (ruta a `TfhkaNet.dll`)
+- El agente usa `pythonnet` para cargar el DLL y ejecutar `PrintXReport()` / `PrintZReport()`.

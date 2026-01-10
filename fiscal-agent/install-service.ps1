@@ -3,6 +3,8 @@ param(
   [string]$BaseUrl = "http://127.0.0.1:8000",
   [string]$Token = "",
   [string]$Caja = "",
+  [string]$ComPort = "",
+  [string]$TfhkaDllPath = "",
   [string]$EnvFile = "",
   [string]$NssmPath = "",
   [switch]$Uninstall
@@ -74,6 +76,12 @@ if ($EnvFile) {
   if (-not $Caja -and $cfg.ContainsKey('LEBRUN_FISCAL_CAJA')) {
     $Caja = $cfg['LEBRUN_FISCAL_CAJA']
   }
+  if (-not $ComPort -and $cfg.ContainsKey('LEBRUN_FISCAL_COM_PORT')) {
+    $ComPort = $cfg['LEBRUN_FISCAL_COM_PORT']
+  }
+  if (-not $TfhkaDllPath -and $cfg.ContainsKey('LEBRUN_TFHKA_DLL_PATH')) {
+    $TfhkaDllPath = $cfg['LEBRUN_TFHKA_DLL_PATH']
+  }
 }
 
 if (-not (Test-Path $AgentPy)) {
@@ -111,6 +119,13 @@ if ($Caja) {
   & $Nssm set $ServiceName AppEnvironmentExtra "LEBRUN_FISCAL_CAJA=$Caja" | Out-Null
 }
 & $Nssm set $ServiceName AppEnvironmentExtra "LEBRUN_FISCAL_POLL_SECONDS=2" | Out-Null
+
+if ($ComPort) {
+  & $Nssm set $ServiceName AppEnvironmentExtra "LEBRUN_FISCAL_COM_PORT=$ComPort" | Out-Null
+}
+if ($TfhkaDllPath) {
+  & $Nssm set $ServiceName AppEnvironmentExtra "LEBRUN_TFHKA_DLL_PATH=$TfhkaDllPath" | Out-Null
+}
 
 # Logs
 & $Nssm set $ServiceName AppStdout $Stdout | Out-Null
