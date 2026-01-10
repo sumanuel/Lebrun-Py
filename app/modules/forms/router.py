@@ -187,6 +187,210 @@ def facturacion_reportes_zx_post(request: Request, action: str = Form("")):
     return RedirectResponse(url="/facturacion/reportes/zx", status_code=303)
 
 
+@router.get("/facturacion/cierre-caja", response_class=HTMLResponse)
+def facturacion_cierre_caja(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    menu = _load_menu(user)
+    message = request.session.pop("flash", None)
+    caja = user.get("caja")
+
+    return templates.TemplateResponse(
+        "facturacion/cierre_caja.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/cierre-caja",
+            "title": "Cierre de Caja - Lebrun",
+            "message": message,
+            "error": None,
+            "caja": caja,
+        },
+    )
+
+
+@router.post("/facturacion/cierre-caja")
+def facturacion_cierre_caja_post(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    # Stub: en WinForms esto valida caja activa y genera reporte.
+    caja = user.get("caja")
+    if not caja:
+        request.session["flash"] = "No se puede cerrar: usuario sin caja asignada."
+    else:
+        request.session["flash"] = (
+            f"Solicitud registrada: cierre de caja {caja}. Próximo paso: migrar lógica de cierre + reportes."
+        )
+    return RedirectResponse(url="/facturacion/cierre-caja", status_code=303)
+
+
+@router.get("/facturacion/clave-confirmacion", response_class=HTMLResponse)
+def facturacion_clave_confirmacion(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    menu = _load_menu(user)
+    message = request.session.pop("flash", None)
+
+    return templates.TemplateResponse(
+        "facturacion/clave_confirmacion.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/clave-confirmacion",
+            "title": "Clave de Confirmación - Lebrun",
+            "message": message,
+            "error": None,
+        },
+    )
+
+
+@router.post("/facturacion/clave-confirmacion")
+def facturacion_clave_confirmacion_post(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    # Stub: validación real pendiente (supervisión/permisos).
+    if not (username or "").strip() or not (password or "").strip():
+        request.session["flash"] = "Debe indicar usuario y contraseña."
+        return RedirectResponse(url="/facturacion/clave-confirmacion", status_code=303)
+
+    request.session["flash"] = "Confirmación registrada (stub). Próximo paso: validar supervisor en sysconf + permisos."
+    return RedirectResponse(url="/facturacion/clave-confirmacion", status_code=303)
+
+
+@router.get("/facturacion/importar-devolucion", response_class=HTMLResponse)
+def facturacion_importar_devolucion(request: Request, q: str | None = Query(None)):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    menu = _load_menu(user)
+    message = request.session.pop("flash", None)
+
+    return templates.TemplateResponse(
+        "facturacion/importar_devolucion.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/importar-devolucion",
+            "title": "Importar Devolución - Lebrun",
+            "message": message,
+            "error": None,
+            "q": q,
+        },
+    )
+
+
+@router.get("/facturacion/factura/nueva", response_class=HTMLResponse)
+def facturacion_factura_nueva(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    menu = _load_menu(user)
+    return templates.TemplateResponse(
+        "facturacion/factura_stub.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/factura/nueva",
+            "title": "Nueva Factura - Lebrun",
+            "page_title": "Nueva Factura",
+            "message": "Stub: aquí irá la migración de frmFactura (FAV).",
+            "numero": None,
+            "codigo": None,
+        },
+    )
+
+
+@router.get("/facturacion/devolucion/nueva", response_class=HTMLResponse)
+def facturacion_devolucion_nueva(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    menu = _load_menu(user)
+    return templates.TemplateResponse(
+        "facturacion/factura_stub.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/devolucion/nueva",
+            "title": "Nueva Devolución - Lebrun",
+            "page_title": "Nueva Devolución",
+            "message": "Stub: aquí irá la creación de DEV y el flujo de importación parcial/total.",
+            "numero": None,
+            "codigo": None,
+        },
+    )
+
+
+@router.get("/facturacion/facturas/ver", response_class=HTMLResponse)
+def facturacion_facturas_ver(
+    request: Request,
+    numero: str | None = Query(None),
+    codigo: str | None = Query(None),
+):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    menu = _load_menu(user)
+    return templates.TemplateResponse(
+        "facturacion/factura_stub.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/facturas",
+            "title": "Ver Documento - Lebrun",
+            "page_title": "Ver Documento",
+            "message": "Stub: ver detalle del documento (cabecera + items).",
+            "numero": numero,
+            "codigo": codigo,
+        },
+    )
+
+
+@router.get("/facturacion/facturas/imprimir", response_class=HTMLResponse)
+def facturacion_facturas_imprimir(
+    request: Request,
+    numero: str | None = Query(None),
+    codigo: str | None = Query(None),
+):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    menu = _load_menu(user)
+    return templates.TemplateResponse(
+        "facturacion/factura_stub.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/facturas",
+            "title": "Imprimir Documento - Lebrun",
+            "page_title": "Imprimir Documento",
+            "message": "Stub: aquí irá la integración de impresión (fiscal/no fiscal).",
+            "numero": numero,
+            "codigo": codigo,
+        },
+    )
+
+
 @router.get("/ventas/pagare", response_class=HTMLResponse)
 def ventas_pagare(request: Request):
     return _render_form_page(

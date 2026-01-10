@@ -1,0 +1,45 @@
+{% extends "base.html" %} {% block page_title %}Clave de Confirmación{% endblock
+%} {% block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block
+content %}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">Clave de Confirmación</div>
+      <div class="card__body">
+        {% if message %}
+        <div class="alert">{{ message }}</div>
+        {% endif %} {% if error %}
+        <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        <p class="muted">
+          Versión web inicial de <b>frmClaveConfirmacion2</b>. Se usa para
+          confirmar operaciones con un usuario supervisor.
+        </p>
+
+        <form method="post" action="/facturacion/clave-confirmacion">
+          <div class="form-row">
+            <label class="label">Usuario supervisor</label>
+            <input class="input" name="username" autocomplete="off" />
+          </div>
+
+          <div class="form-row">
+            <label class="label">Contraseña</label>
+            <input class="input" name="password" type="password" />
+          </div>
+
+          <div class="actions">
+            <button class="btn" type="submit">Confirmar</button>
+            <a class="btn btn--ghost" href="/facturacion/facturas">Cancelar</a>
+          </div>
+        </form>
+
+        <div class="code" style="margin-top: 12px">
+          Próximo paso: validar contra `sysconf.confusuario` y verificar permiso
+          tipo “clave supervisión”.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

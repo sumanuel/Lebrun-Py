@@ -1,0 +1,27 @@
+{% extends "base.html" %} {% block page_title %}{{ page_title }}{% endblock %}
+{% block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block content
+%}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">{{ page_title }}</div>
+      <div class="card__body">
+        <p class="muted">
+          Implementación inicial (stub) para migración de facturación.
+        </p>
+        {% if message %}
+        <div class="alert">{{ message }}</div>
+        {% endif %} {% if numero or codigo %}
+        <div class="code">
+          Documento: {{ numero or '' }} | Cliente: {{ codigo or '' }}
+        </div>
+        {% endif %}
+
+        <div class="actions" style="margin-top: 12px">
+          <a class="btn btn--ghost" href="/facturacion/facturas">Volver</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

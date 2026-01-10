@@ -1,0 +1,59 @@
+{% extends "base.html" %} {% block page_title %}Importar Devolución{% endblock
+%} {% block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block
+content %}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">Importar Devolución</div>
+      <div class="card__body">
+        {% if message %}
+        <div class="alert">{{ message }}</div>
+        {% endif %} {% if error %}
+        <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        <p class="muted">
+          Versión web inicial de <b>frmImportarDev</b>. En WinForms carga una
+          factura afectada y permite devolver parcial/total (con confirmación).
+        </p>
+
+        <div class="toolbar">
+          <div class="toolbar__left">
+            <form
+              method="get"
+              action="/facturacion/importar-devolucion"
+              class="toolbar__left"
+            >
+              <input
+                class="input"
+                type="search"
+                name="q"
+                placeholder="Buscar factura a afectar…"
+                value="{{ q or '' }}"
+                style="min-width: 320px"
+              />
+              <button class="btn" type="submit">Buscar</button>
+            </form>
+          </div>
+          <div class="toolbar__right">
+            <a class="btn btn--ghost" href="/facturacion/clave-confirmacion"
+              >Requiere Supervisor</a
+            >
+          </div>
+        </div>
+
+        <div class="code">
+          Próximo paso: seleccionar FAV (por caja) y cargar items, saldos
+          exportados, y luego generar DEV.
+        </div>
+
+        <div class="actions" style="margin-top: 12px">
+          <a class="btn btn--ghost" href="/facturacion/facturas"
+            >Volver a Facturas</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
