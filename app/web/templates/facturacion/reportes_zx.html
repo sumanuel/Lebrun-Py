@@ -1,0 +1,57 @@
+{% extends "base.html" %} {% block page_title %}Reportes Z/X{% endblock %} {%
+block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block content %}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">Reportes Z / X</div>
+      <div class="card__body">
+        {% if message %}
+        <div class="alert">{{ message }}</div>
+        {% endif %} {% if error %}
+        <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        <p class="muted">
+          Esta pantalla es el inicio de <b>ReportesZ_X</b>. Por seguridad,
+          todavía no se envía nada directo a la impresora fiscal desde el
+          servidor web.
+        </p>
+
+        <div class="toolbar">
+          <div class="toolbar__left">
+            <form method="post" action="/facturacion/reportes/zx">
+              <input type="hidden" name="action" value="X" />
+              <button class="btn" type="submit">Emitir Reporte X</button>
+            </form>
+
+            <form
+              method="post"
+              action="/facturacion/reportes/zx"
+              onsubmit="return confirm('¿Seguro que desea emitir Reporte Z? Esta operación suele ser irreversible.');"
+            >
+              <input type="hidden" name="action" value="Z" />
+              <button class="btn btn--danger" type="submit">
+                Emitir Reporte Z
+              </button>
+            </form>
+          </div>
+
+          <div class="toolbar__right">
+            <span class="badge">Siguiente paso: integrar servicio local</span>
+          </div>
+        </div>
+
+        <div class="code">
+          Recomendación: correr un servicio local (Windows) que tenga acceso al
+          puerto/driver fiscal, y que el backend web le envíe la orden
+          (cola/HTTP local).
+        </div>
+
+        <div class="actions" style="margin-top: 12px">
+          <a class="btn btn--ghost" href="/">Inicio</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

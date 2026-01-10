@@ -20,11 +20,25 @@ class FormMapping:
 # 5 formularios iniciales (alias múltiples porque en BD puede venir con namespace completo o solo el nombre).
 MAPPINGS: tuple[FormMapping, ...] = (
     FormMapping(
+        key="lebrun.formularios.facturacion.lbxFacturas",
+        title="Facturas",
+        path="/facturacion/facturas",
+        description="Listado de facturas/notas por caja (versión web inicial).",
+        aliases=("lbxFacturas", "lbx_fact", "Facturas"),
+    ),
+    FormMapping(
         key="lebrun.formularios.complementos.frmConsultaArticulos",
         title="Visor de Precios",
         path="/ventas/visor-precios",
         description="Consulta rápida de artículos/precios (versión web inicial).",
         aliases=("frmConsultaArticulos", "Visor"),
+    ),
+    FormMapping(
+        key="lebrun.formularios.facturacion.ReportesZ_X",
+        title="Reportes Z/X",
+        path="/facturacion/reportes/zx",
+        description="Emisión de reportes X/Z (stub web inicial).",
+        aliases=("ReportesZ_X", "ReporteZ_X", "ReporteZX"),
     ),
     FormMapping(
         key="lebrun.formularios.complementos.frmPagare",

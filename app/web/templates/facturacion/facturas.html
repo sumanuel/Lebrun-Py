@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block page_title %}Facturas{% endblock %}
+{% block sidebar %}{% include "_sidebar.html" %}{% endblock %}
+
+{% block content %}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">Facturas</div>
+      <div class="card__body">
+        {% if error %}
+          <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        <div class="toolbar">
+          <div class="toolbar__left">
+            <form method="get" action="/facturacion/facturas" class="toolbar__left">
+              <select name="tipdoc" class="input" style="min-width: 120px">
+                <option value="FAV" {% if tipdoc=='FAV' %}selected{% endif %}>FAV</option>
+                <option value="DEV" {% if tipdoc=='DEV' %}selected{% endif %}>DEV</option>
+                <option value="NDE" {% if tipdoc=='NDE' %}selected{% endif %}>NDE</option>
+              </select>
+
+              <input
+                class="input"
+                type="search"
+                name="q"
+                placeholder="Buscar por número, fiscal o cliente…"
+                value="{{ q or '' }}"
+                style="min-width: 320px"
+              />
+
+              <button class="btn" type="submit">Buscar</button>
+              <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc={{ tipdoc }}">Limpiar</a>
+            </form>
+          </div>
+
+          <div class="toolbar__right">
+            {% if caja %}<span class="badge">Caja: {{ caja }}</span>{% endif %}
+            <span class="badge">Mostradas: {{ rows|length }}</span>
+          </div>
+        </div>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Cliente</th>
+              <th>Nombre</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+              <th style="text-align:right">Neto</th>
+              <th>Fiscal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td>{{ r.dcli_numero }}</td>
+                <td>{{ r.dcli_codigo }}</td>
+                <td>{{ r.cli_nombre }}</td>
+                <td>{{ r.dcli_fecha }}</td>
+                <td>{{ r.dcli_estado }}</td>
+                <td style="text-align:right">{{ r.dcli_neto }}</td>
+                <td>{{ r.dcli_numfis }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="7" class="muted">Sin resultados.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="actions" style="margin-top: 12px">
+          <a class="btn btn--ghost" href="/">Inicio</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

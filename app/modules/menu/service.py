@@ -46,19 +46,21 @@ class MenuService:
                         # En WinForms el "formulario" es una clase/identificador.
                         # En web lo mapeamos a una pantalla placeholder; luego se enruta a vistas reales.
                         href = f"/open?form={quote_plus(route)}"
-                grouped[group_name].append(
-                    {
-                        "label": str(row.get("menu_nombre") or row.get("hijo") or "(sin nombre)"),
-                        "route": route,
-                        "href": href,
-                    }
-                )
+                if href:
+                    grouped[group_name].append(
+                        {
+                            "label": str(row.get("menu_nombre") or row.get("hijo") or "(sin nombre)"),
+                            "route": route,
+                            "href": href,
+                        }
+                    )
 
-            groups = [
-                {"name": name, "items": grouped[name]}
-                for name in sorted(grouped.keys(), key=lambda x: (x != "General", x))
-            ]
+            groups = []
+            for name in sorted(grouped.keys(), key=lambda x: (x != "General", x)):
+                if grouped[name]:
+                    groups.append({"name": name, "items": grouped[name]})
 
-            result.append({"module": module_name, "groups": groups})
+            if groups:
+                result.append({"module": module_name, "groups": groups})
 
         return result

@@ -2,28 +2,30 @@
 <div class="menu__section" data-module="{{ m.module|lower }}">
   <button class="menu__section-title" type="button" data-accordion>
     <span class="menu__section-text">{{ m.module }}</span>
-    <span class="menu__chev">▾</span>
+    <span class="menu__chev">▸</span>
   </button>
 
-  <div class="menu__section-body">
+  <div class="menu__section-body" style="display: none">
     {% for g in m.groups %}
     <div class="menu__group" data-group="{{ g.name|lower }}">
-      <div class="menu__group-title">{{ g.name }}</div>
-      <ul class="menu__list">
-        {% for it in g['items'] %}
-        <li class="menu__item" data-label="{{ it.label|lower }}">
-          {% if it.href %}
-          <a
-            class="menu__link {% if active_href and it.href == active_href %}is-active{% endif %}"
-            href="{{ it.href }}"
-            >{{ it.label }}</a
-          >
-          {% else %}
-          <span class="menu__link menu__link--disabled">{{ it.label }}</span>
-          {% endif %}
-        </li>
-        {% endfor %}
-      </ul>
+      <button class="menu__group-title" type="button" data-accordion-group>
+        <span>{{ g.name }}</span>
+        <span class="menu__chev menu__chev--sm">▸</span>
+      </button>
+
+      <div class="menu__group-body" style="display: none">
+        <ul class="menu__list">
+          {% for it in g['items'] %} {% if it.href %}
+          <li class="menu__item" data-label="{{ it.label|lower }}">
+            <a
+              class="menu__link {% if active_href and it.href == active_href %}is-active{% endif %}"
+              href="{{ it.href }}"
+              >{{ it.label }}</a
+            >
+          </li>
+          {% endif %} {% endfor %}
+        </ul>
+      </div>
     </div>
     {% endfor %}
   </div>
