@@ -3,6 +3,7 @@ param(
   [string]$BaseUrl = "http://127.0.0.1:8000",
   [string]$Token = "",
   [string]$Caja = "",
+  [string]$EnvFile = "",
   [string]$NssmPath = "",
   [switch]$Uninstall
 )
@@ -20,6 +21,23 @@ $VenvDir = Join-Path $Here ".venv"
 $Py = Join-Path $VenvDir "Scripts\python.exe"
 $Pip = Join-Path $VenvDir "Scripts\pip.exe"
 $Req = Join-Path $Here "requirements.txt"
+
+function Load-EnvFile([string]$path) {
+  if (-not $path) { return @{} }
+  if (-not (Test-Path $path)) { throw "No existe EnvFile: $path" }
+  $map = @{}
+  Get-Content $path | ForEach-Object {
+    $line = $_.Trim()
+    if (-not $line) { return }
+    if ($line.StartsWith('#')) { return }
+    $idx = $line.IndexOf('=')
+    if ($idx -lt 1) { return }
+    $k = $line.Substring(0, $idx).Trim()
+    $v = $line.Substring($idx + 1).Trim()
+    $map[$k] = $v
+  }
+  return $map
+}
 
 function Find-Nssm {
   if ($NssmPath -and (Test-Path $NssmPath)) { return $NssmPath }
@@ -41,6 +59,21 @@ if ($Uninstall) {
   & $Nssm remove $ServiceName confirm | Out-Null
   Write-Host "Servicio removido: $ServiceName"
   exit 0
+}
+
+# Cargar valores desde EnvFile si se indicó (sobrescribe defaults si BaseUrl/Token/Caja no vienen por parámetro)
+if ($EnvFile) {
+  $envPath = if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $Here $EnvFile }
+  $cfg = Load-EnvFile $envPath
+  if (-not $PSBoundParameters.ContainsKey('BaseUrl') -and $cfg.ContainsKey('LEBRUN_SERVER_URL')) {
+    $BaseUrl = $cfg['LEBRUN_SERVER_URL']
+  }
+  if (-not $Token -and $cfg.ContainsKey('LEBRUN_FISCAL_AGENT_TOKEN')) {
+    $Token = $cfg['LEBRUN_FISCAL_AGENT_TOKEN']
+  }
+  if (-not $Caja -and $cfg.ContainsKey('LEBRUN_FISCAL_CAJA')) {
+    $Caja = $cfg['LEBRUN_FISCAL_CAJA']
+  }
 }
 
 if (-not (Test-Path $AgentPy)) {
