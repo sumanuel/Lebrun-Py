@@ -12,9 +12,9 @@ block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block content %}
         {% endif %}
 
         <p class="muted">
-          Esta pantalla es el inicio de <b>ReportesZ_X</b>. Por seguridad,
-          todavía no se envía nada directo a la impresora fiscal desde el
-          servidor web.
+          Esta pantalla es el inicio de <b>ReportesZ_X</b>. Por seguridad, el
+          servidor web <b>solo encola</b> la orden y el servicio local (agente
+          Windows) la ejecuta en la impresora fiscal.
         </p>
 
         <div class="toolbar">
@@ -37,14 +37,14 @@ block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block content %}
           </div>
 
           <div class="toolbar__right">
-            <span class="badge">Siguiente paso: integrar servicio local</span>
+            <span class="badge">Ejecuta vía Fiscal Agent</span>
           </div>
         </div>
 
         <div class="code">
-          Recomendación: correr un servicio local (Windows) que tenga acceso al
-          puerto/driver fiscal, y que el backend web le envíe la orden
-          (cola/HTTP local).
+          Si no imprime: verifique que el servicio del agente está corriendo, y
+          que tenga configurado `LEBRUN_FISCAL_COM_PORT` y
+          `LEBRUN_TFHKA_DLL_PATH`.
         </div>
 
         <div class="actions" style="margin-top: 12px">

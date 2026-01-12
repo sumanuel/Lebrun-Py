@@ -6,7 +6,17 @@ from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
 from app.core.exceptions import DatabaseUnavailable
+from app.modules.clientes.repository import ClientesRepository
 from app.modules.facturacion.repository import FacturacionRepository
+from app.modules.facturacion.factura_session import (
+    add_item,
+    add_pago,
+    clear as clear_invoice,
+    invoice_default,
+    recalc,
+    remove_item,
+    remove_pago,
+)
 from app.modules.fiscal.service import FiscalService
 from app.modules.menu.service import MenuService
 from app.modules.ventas.repository import VentasRepository
@@ -27,7 +37,7 @@ def _load_menu(user: dict) -> list[dict]:
     menu_map = user.get("menu_map")
     if menu_map:
         try:
-            menu = MenuService().build_menu(str(menu_map))
+            menu = MenuService().build_menu(str(menu_map), user=user)
         except Exception:
             menu = []
     return menu
@@ -60,7 +70,8 @@ def facturacion_facturas(
     request: Request,
     tipdoc: str = Query("FAV"),
     q: str | None = Query(None),
-    limit: int = Query(100),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
 ):
     user, redirect = _require_user(request)
     if redirect:
@@ -80,7 +91,9 @@ def facturacion_facturas(
                 caja=str(caja),
                 tipdoc=str(tipdoc or "FAV"),
                 q=(q or None),
-                limit=limit,
+                date_from=(date_from or None),
+                date_to=(date_to or None),
+                limit=100,
             )
         except DatabaseUnavailable as e:
             error = str(e)
@@ -91,13 +104,15 @@ def facturacion_facturas(
             "request": request,
             "user": user,
             "menu": menu,
-            "active_href": "/facturacion/facturas",
+            "active_href": f"/facturacion/facturas?tipdoc={(tipdoc or 'FAV').strip().upper()}",
             "title": "Facturas - Lebrun",
             "rows": rows,
             "error": error,
             "caja": caja,
             "tipdoc": (tipdoc or "FAV").strip().upper(),
             "q": q,
+            "date_from": date_from,
+            "date_to": date_to,
         },
     )
 
@@ -172,6 +187,31 @@ def facturacion_reportes_zx(request: Request):
 
 @router.post("/facturacion/reportes/zx")
 def facturacion_reportes_zx_post(request: Request, action: str = Form("")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    action = (action or "").strip().upper()
+    if action not in {"X", "Z"}:
+        request.session["flash"] = "Acción inválida."
+        return RedirectResponse(url="/facturacion/reportes/zx", status_code=303)
+
+    caja = user.get("caja")
+    try:
+        job_id = FiscalService().enqueue_report(
+            caja=str(caja) if caja is not None else None,
+            report_type=action,
+            requested_by=str(user.get("username") or ""),
+        )
+        request.session["flash"] = f"Orden encolada: Reporte {action}. Job: {job_id}"
+    except Exception as e:
+        request.session["flash"] = f"No se pudo encolar el reporte: {e}"
+    return RedirectResponse(url="/facturacion/reportes/zx", status_code=303)
+
+
+@router.get("/facturacion/reportes/zx/run")
+def facturacion_reportes_zx_run(request: Request, action: str = Query("")):
+    # Permite que un item de menú "Reporte X" / "Reporte Z" ejecute directo.
     user, redirect = _require_user(request)
     if redirect:
         return redirect
@@ -303,29 +343,166 @@ def facturacion_importar_devolucion(request: Request, q: str | None = Query(None
 
 
 @router.get("/facturacion/factura/nueva", response_class=HTMLResponse)
-def facturacion_factura_nueva(request: Request):
+def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
     menu = _load_menu(user)
+
+    tipdoc = (tipdoc or "FAV").strip().upper() or "FAV"
+    if tipdoc not in {"FAV", "DEV", "NDE"}:
+        tipdoc = "FAV"
+
+    inv = request.session.get("factura")
+    if not isinstance(inv, dict):
+        inv = invoice_default(tipdoc)
+    inv["tipdoc"] = tipdoc
+    recalc(inv)
+    request.session["factura"] = inv
+
     return templates.TemplateResponse(
-        "facturacion/factura_stub.html",
+        "facturacion/frm_factura.html",
         {
             "request": request,
             "user": user,
             "menu": menu,
             "active_href": "/facturacion/factura/nueva",
-            "title": "Nueva Factura - Lebrun",
-            "page_title": "Nueva Factura",
-            "message": "Stub: aquí irá la migración de frmFactura (FAV).",
-            "numero": None,
-            "codigo": None,
+            "title": "Factura - Lebrun",
+            "page_title": "Factura",
+            "message": None,
+            "inv": inv,
+        },
+    )
+
+
+@router.post("/facturacion/factura/nueva", response_class=HTMLResponse)
+def facturacion_factura_nueva_post(
+    request: Request,
+    tipdoc: str = Form("FAV"),
+    action: str = Form(""),
+    # cliente
+    cli_codigo: str = Form(""),
+    # producto
+    prod_codigo: str = Form(""),
+    prod_cantidad: str = Form("1"),
+    prod_precio: str = Form(""),
+    prod_desc: str = Form("0"),
+    remove_item_idx: str = Form(""),
+    # pago
+    pago_modo: str = Form("Efectivo"),
+    pago_banco: str = Form(""),
+    pago_ref: str = Form(""),
+    pago_monto: str = Form(""),
+    remove_pago_idx: str = Form(""),
+):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    menu = _load_menu(user)
+
+    tipdoc = (tipdoc or "FAV").strip().upper() or "FAV"
+    if tipdoc not in {"FAV", "DEV", "NDE"}:
+        tipdoc = "FAV"
+
+    inv = request.session.get("factura")
+    if not isinstance(inv, dict):
+        inv = invoice_default(tipdoc)
+    inv["tipdoc"] = tipdoc
+
+    action = (action or "").strip().lower()
+    message: str | None = None
+
+    try:
+        if action == "buscar_cliente":
+            cli_codigo = (cli_codigo or "").strip()
+            if not cli_codigo:
+                message = "Indique un código de cliente."
+            else:
+                row = ClientesRepository().get_cliente(codigo=cli_codigo)
+                if not row:
+                    message = f"Cliente no encontrado: {cli_codigo}"
+                else:
+                    inv["cliente"] = {
+                        "codigo": str(row.get("cli_codigo") or ""),
+                        "rif": str(row.get("cli_rif") or ""),
+                        "nombre": str(row.get("cli_nombre") or ""),
+                        "direccion": str(row.get("cli_direcc") or ""),
+                    }
+        elif action == "agregar_item":
+            code = (prod_codigo or "").strip()
+            if not code:
+                message = "Indique un código de producto."
+            else:
+                prod = VentasRepository().get_producto_by_codigo(codigo=code)
+                if not prod:
+                    message = f"Producto no encontrado: {code}"
+                else:
+                    precio = prod_precio.strip() if (prod_precio or "").strip() else str(prod.get("Precio") or "0")
+                    add_item(
+                        inv,
+                        producto={
+                            "codigo": prod.get("Codigo"),
+                            "descripcion": prod.get("Descripcion"),
+                            "unidad": prod.get("Unidad"),
+                        },
+                        cantidad=prod_cantidad,
+                        precio=precio,
+                        desc_pct=prod_desc,
+                    )
+                    inv["producto"] = {"codigo": "", "nombre": "", "unidad": "", "cantidad": "1", "precio": ""}
+        elif action == "eliminar_item":
+            remove_item(inv, remove_item_idx)
+        elif action == "agregar_pago":
+            modo = (pago_modo or "").strip()
+            if not (pago_monto or "").strip():
+                message = "Indique monto a abonar."
+            else:
+                # Reglas simples (WinForms exige banco+numero si no es efectivo)
+                if modo.lower() != "efectivo":
+                    if not (pago_banco or "").strip() or not (pago_ref or "").strip():
+                        message = "Para este modo de pago debe indicar banco y número/referencia."
+                    else:
+                        add_pago(inv, modo=modo, banco=pago_banco, referencia=pago_ref, monto=pago_monto)
+                else:
+                    add_pago(inv, modo=modo, banco="N/A", referencia="N/A", monto=pago_monto)
+        elif action == "eliminar_pago":
+            remove_pago(inv, remove_pago_idx)
+        elif action == "limpiar":
+            inv = clear_invoice(inv)
+            inv["tipdoc"] = tipdoc
+        else:
+            # action vacío o no soportado: no hacer nada
+            pass
+    except DatabaseUnavailable as e:
+        message = str(e)
+    except Exception as e:
+        message = str(e)
+
+    recalc(inv)
+    request.session["factura"] = inv
+
+    return templates.TemplateResponse(
+        "facturacion/frm_factura.html",
+        {
+            "request": request,
+            "user": user,
+            "menu": menu,
+            "active_href": "/facturacion/factura/nueva",
+            "title": "Factura - Lebrun",
+            "page_title": "Factura",
+            "message": message,
+            "inv": inv,
         },
     )
 
 
 @router.get("/facturacion/devolucion/nueva", response_class=HTMLResponse)
-def facturacion_devolucion_nueva(request: Request):
+def facturacion_devolucion_nueva(
+    request: Request,
+    ref_numero: str | None = Query(None),
+    ref_codigo: str | None = Query(None),
+):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
@@ -340,8 +517,8 @@ def facturacion_devolucion_nueva(request: Request):
             "title": "Nueva Devolución - Lebrun",
             "page_title": "Nueva Devolución",
             "message": "Stub: aquí irá la creación de DEV y el flujo de importación parcial/total.",
-            "numero": None,
-            "codigo": None,
+            "numero": ref_numero,
+            "codigo": ref_codigo,
         },
     )
 

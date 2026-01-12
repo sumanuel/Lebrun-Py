@@ -21,6 +21,41 @@ class ProductoRow:
 
 
 class VentasRepository:
+    def get_producto_by_codigo(self, *, codigo: str) -> dict | None:
+        codigo = (codigo or "").strip()
+        if not codigo:
+            return None
+
+        sql = text(
+            """
+            SELECT
+              adminv.inv_codigo AS Codigo,
+              adminv.inv_descri AS Descripcion,
+              adminvmed.ime_undmed AS Unidad,
+              admprecios.pre_precio AS Precio,
+              existencia AS Existencia,
+              inv_ex AS Exento
+            FROM adminv
+            LEFT OUTER JOIN adminv2 ON adminv.inv_codigo = adminv2.inv2_codigo
+            LEFT JOIN adminvmed ON adminvmed.ime_codigo = adminv.inv_codigo
+            LEFT JOIN admprecios
+              ON admprecios.pre_codigo = adminv.inv_codigo
+             AND admprecios.pre_lista = 'A'
+             AND admprecios.pre_act = '1'
+            WHERE inv_estado = 'Activo'
+              AND pre_undmed = ime_undmed
+              AND adminv.inv_codigo = :code
+            LIMIT 1
+            """
+        )
+
+        try:
+            with session_for(settings.db_sysadm) as s:
+                row = s.execute(sql, {"code": codigo}).mappings().first()
+                return dict(row) if row else None
+        except SQLAlchemyError as e:
+            raise DatabaseUnavailable("Error al buscar producto (sisadm).") from e
+
     def list_productos(
         self,
         *,

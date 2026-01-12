@@ -17,8 +17,13 @@
         <ul class="menu__list">
           {% for it in g['items'] %} {% if it.href %}
           <li class="menu__item" data-label="{{ it.label|lower }}">
+            {% set it_base = it.href.split('?')[0] %} {% set active_base =
+            active_href.split('?')[0] if active_href else '' %} {% set
+            active_exact = (active_href and it.href == active_href) %} {% set
+            active_base_only = (it_base == active_base and ('?' not in it.href)
+            and ('?' not in (active_href or ''))) %}
             <a
-              class="menu__link {% if active_href and it.href == active_href %}is-active{% endif %}"
+              class="menu__link {% if active_exact or active_base_only %}is-active{% endif %}"
               href="{{ it.href }}"
               >{{ it.label }}</a
             >

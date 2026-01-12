@@ -16,6 +16,8 @@ class FacturacionRepository:
         caja: str,
         tipdoc: str,
         q: str | None,
+        date_from: str | None,
+        date_to: str | None,
         limit: int,
     ) -> list[dict]:
         # Nota: usamos DISTINCT en lugar de GROUP BY para evitar fallas con ONLY_FULL_GROUP_BY.
@@ -45,6 +47,14 @@ class FacturacionRepository:
 
         params: dict = {"tipdoc": tipdoc, "caja": caja}
 
+        if date_from and date_from.strip():
+            base_sql += "\n  AND DATE(dcli_fecha) >= :date_from"
+            params["date_from"] = date_from.strip()
+
+        if date_to and date_to.strip():
+            base_sql += "\n  AND DATE(dcli_fecha) <= :date_to"
+            params["date_to"] = date_to.strip()
+
         if q and q.strip():
             term = f"%{q.strip()}%"
             base_sql += """
@@ -58,7 +68,7 @@ class FacturacionRepository:
             params["term"] = term
 
         base_sql += f"""
-            ORDER BY dcli_numero DESC, dcli_codigo ASC
+            ORDER BY dcli_fecha DESC, dcli_numero DESC, dcli_codigo ASC
             LIMIT {int(limit)}
         """
 
@@ -74,13 +84,16 @@ class FacturacionRepository:
         caja: str,
         tipdoc: str = "FAV",
         q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
         limit: int = 100,
     ) -> list[dict]:
         tipdoc = (tipdoc or "").strip().upper() or "FAV"
         if tipdoc not in {"FAV", "DEV", "NDE"}:
             tipdoc = "FAV"
 
-        limit = max(1, min(int(limit or 100), 300))
+        # En lbxFacturas el comportamiento esperado es "últimas 100".
+        limit = max(1, min(int(limit or 100), 100))
 
         try:
             # Tabla principal usada por el WinForms/implementación previa.
@@ -89,6 +102,8 @@ class FacturacionRepository:
                 caja=caja,
                 tipdoc=tipdoc,
                 q=q,
+                date_from=date_from,
+                date_to=date_to,
                 limit=limit,
             )
         except SQLAlchemyError as e:
@@ -99,6 +114,8 @@ class FacturacionRepository:
                     caja=caja,
                     tipdoc=tipdoc,
                     q=q,
+                    date_from=date_from,
+                    date_to=date_to,
                     limit=limit,
                 )
             except SQLAlchemyError as e2:

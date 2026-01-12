@@ -24,6 +24,22 @@
 
               <input
                 class="input"
+                type="date"
+                name="date_from"
+                value="{{ date_from or '' }}"
+                title="Desde"
+              />
+
+              <input
+                class="input"
+                type="date"
+                name="date_to"
+                value="{{ date_to or '' }}"
+                title="Hasta"
+              />
+
+              <input
+                class="input"
                 type="search"
                 name="q"
                 placeholder="Buscar por número, fiscal o cliente…"
@@ -80,6 +96,7 @@
                 <td>
                   <a class="btn btn--ghost" style="padding: 6px 10px" href="/facturacion/facturas/ver?numero={{ r.dcli_numero }}&codigo={{ r.dcli_codigo }}">Ver</a>
                   <a class="btn btn--ghost" style="padding: 6px 10px" href="/facturacion/facturas/imprimir?numero={{ r.dcli_numero }}&codigo={{ r.dcli_codigo }}">Imprimir</a>
+                  <a class="btn btn--ghost" style="padding: 6px 10px" href="/facturacion/devolucion/nueva?ref_numero={{ r.dcli_numero }}&ref_codigo={{ r.dcli_codigo }}">Devolución</a>
                 </td>
               </tr>
             {% else %}

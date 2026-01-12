@@ -1,0 +1,462 @@
+{% extends "base.html" %} {% block page_title %}Factura{% endblock %} {% block
+sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block content %} {% set
+tipdoc = inv.tipdoc if inv else 'FAV' %} {% set titulo_doc = 'Factura de Venta'
+if tipdoc=='FAV' else ('Devolución de Venta' if tipdoc=='DEV' else 'Nota de
+Débito') %}
+
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">Lebrun - {{ titulo_doc }}</div>
+      <div class="card__body">
+        {% if message %}
+        <div class="alert">{{ message }}</div>
+        {% endif %}
+
+        <div class="factura-shell">
+          <div class="factura-left">
+            <div class="factura-top">
+              <div class="factura-actions">
+                <a
+                  class="btn"
+                  href="#"
+                  onclick="document.getElementById('btnConfirmarDoc').click(); return false;"
+                  >✔</a
+                >
+                <a
+                  class="btn btn--danger"
+                  href="#"
+                  onclick="document.getElementById('btnCancelarDoc').click(); return false;"
+                  >✖</a
+                >
+              </div>
+              <div class="factura-top-meta">
+                <div class="muted" style="margin-right: 10px">Fecha</div>
+                <div class="badge">{{ inv.fecha }}</div>
+              </div>
+            </div>
+
+            <div class="card" style="margin: 10px 0 0">
+              <div class="card__title" style="font-size: 13px">Datos</div>
+              <div class="card__body">
+                <form
+                  method="post"
+                  action="/facturacion/factura/nueva"
+                  class="grid"
+                  style="gap: 10px"
+                >
+                  <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
+                  <input type="hidden" name="action" value="buscar_cliente" />
+
+                  <div class="col-4">
+                    <label class="muted">Cliente</label>
+                    <input
+                      class="input"
+                      name="cli_codigo"
+                      value="{{ inv.cliente.codigo }}"
+                      placeholder="Código"
+                    />
+                  </div>
+                  <div class="col-1" style="display: flex; align-items: end">
+                    <button class="btn btn--ghost" type="submit" title="Buscar">
+                      🔎
+                    </button>
+                  </div>
+                  <div class="col-3">
+                    <label class="muted">RIF</label>
+                    <input
+                      class="input"
+                      value="{{ inv.cliente.rif }}"
+                      readonly
+                    />
+                  </div>
+                  <div class="col-4">
+                    <label class="muted">Núm Fac</label>
+                    <input class="input" value="(pendiente)" readonly />
+                  </div>
+
+                  <div class="col-4">
+                    <label class="muted">Vend</label>
+                    <input
+                      class="input"
+                      value="{{ inv.vendedor.codigo }}"
+                      placeholder="(pendiente)"
+                    />
+                  </div>
+                  <div class="col-8">
+                    <label class="muted">Nombre</label>
+                    <input
+                      class="input"
+                      value="{{ inv.cliente.nombre }}"
+                      readonly
+                    />
+                  </div>
+
+                  <div class="col-12">
+                    <label class="muted">Dirección</label>
+                    <input
+                      class="input"
+                      value="{{ inv.cliente.direccion }}"
+                      readonly
+                    />
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="card" style="margin: 10px 0 0">
+              <div class="card__title" style="font-size: 13px">
+                Datos Producto
+              </div>
+              <div class="card__body">
+                <form
+                  method="post"
+                  action="/facturacion/factura/nueva"
+                  class="grid"
+                  style="gap: 10px"
+                >
+                  <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
+                  <input type="hidden" name="action" value="agregar_item" />
+
+                  <div class="col-4">
+                    <label class="muted">Producto</label>
+                    <input
+                      class="input"
+                      name="prod_codigo"
+                      value=""
+                      placeholder="Código"
+                    />
+                  </div>
+                  <div class="col-5">
+                    <label class="muted">Nombre</label>
+                    <input
+                      class="input"
+                      value=""
+                      placeholder="(auto al agregar)"
+                      readonly
+                    />
+                  </div>
+                  <div class="col-3">
+                    <label class="muted">Unidad</label>
+                    <input class="input" value="" placeholder="" readonly />
+                  </div>
+
+                  <div class="col-3">
+                    <label class="muted">Cantidad</label>
+                    <input class="input" name="prod_cantidad" value="1" />
+                  </div>
+                  <div class="col-3">
+                    <label class="muted">Precio</label>
+                    <input
+                      class="input"
+                      name="prod_precio"
+                      value=""
+                      placeholder="(usa lista A)"
+                    />
+                  </div>
+                  <div class="col-3">
+                    <label class="muted">%Desc</label>
+                    <input class="input" name="prod_desc" value="0" />
+                  </div>
+                  <div
+                    class="col-3"
+                    style="display: flex; align-items: end; gap: 8px"
+                  >
+                    <button class="btn" type="submit">Agregar</button>
+                    <a
+                      class="btn btn--ghost"
+                      href="/ventas/visor-precios"
+                      target="_blank"
+                      >Visor</a
+                    >
+                  </div>
+                </form>
+
+                <div style="height: 10px"></div>
+
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Producto</th>
+                      <th style="text-align: right">Cant.</th>
+                      <th style="text-align: right">Precio</th>
+                      <th style="text-align: right">%Desc</th>
+                      <th style="text-align: right">Total</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for it in inv.items %}
+                    <tr>
+                      <td>{{ it.codigo }}</td>
+                      <td>{{ it.nombre }}</td>
+                      <td style="text-align: right">{{ it.cantidad }}</td>
+                      <td style="text-align: right">{{ it.precio }}</td>
+                      <td style="text-align: right">{{ it.desc }}</td>
+                      <td style="text-align: right">{{ it.total }}</td>
+                      <td style="text-align: right">
+                        <form
+                          method="post"
+                          action="/facturacion/factura/nueva"
+                          style="display: inline"
+                        >
+                          <input
+                            type="hidden"
+                            name="tipdoc"
+                            value="{{ tipdoc }}"
+                          />
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="eliminar_item"
+                          />
+                          <input
+                            type="hidden"
+                            name="remove_item_idx"
+                            value="{{ loop.index0 }}"
+                          />
+                          <button class="btn btn--ghost" type="submit">
+                            Eliminar
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="7" class="muted">Sin items.</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="factura-right">
+            <div class="card" style="margin: 0">
+              <div class="card__title" style="font-size: 13px">
+                Cancelar Factura
+              </div>
+              <div class="card__body">
+                <form
+                  method="post"
+                  action="/facturacion/factura/nueva"
+                  class="grid"
+                  style="gap: 10px"
+                >
+                  <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
+                  <input type="hidden" name="action" value="agregar_pago" />
+
+                  <div class="col-12">
+                    <label class="muted">Modo Pago</label>
+                    <select class="input" name="pago_modo">
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Tarjeta de Debito">
+                        Tarjeta de Debito
+                      </option>
+                      <option value="Tarjeta de Credito">
+                        Tarjeta de Credito
+                      </option>
+                      <option value="Cheque">Cheque</option>
+                    </select>
+                  </div>
+
+                  <div class="col-6">
+                    <label class="muted">Banco</label>
+                    <input
+                      class="input"
+                      name="pago_banco"
+                      placeholder="(pendiente catálogo)"
+                    />
+                  </div>
+                  <div class="col-6">
+                    <label class="muted">N° / Ref</label>
+                    <input class="input" name="pago_ref" placeholder="Número" />
+                  </div>
+
+                  <div class="col-6">
+                    <label class="muted">Monto Abonar</label>
+                    <input class="input" name="pago_monto" placeholder="0.00" />
+                  </div>
+                  <div
+                    class="col-6"
+                    style="display: flex; align-items: end; gap: 8px"
+                  >
+                    <button class="btn" type="submit">Agregar</button>
+                    <a
+                      class="btn btn--ghost"
+                      href="#"
+                      onclick="document.getElementById('btnLimpiar').click(); return false;"
+                      >Limpiar</a
+                    >
+                  </div>
+                </form>
+
+                <div style="height: 10px"></div>
+
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Banco</th>
+                      <th>Detalle</th>
+                      <th>Modo</th>
+                      <th style="text-align: right">Monto</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for p in inv.pagos %}
+                    <tr>
+                      <td>{{ p.banco }}</td>
+                      <td>{{ p.referencia }}</td>
+                      <td>{{ p.modo }}</td>
+                      <td style="text-align: right">{{ p.monto }}</td>
+                      <td style="text-align: right">
+                        <form
+                          method="post"
+                          action="/facturacion/factura/nueva"
+                          style="display: inline"
+                        >
+                          <input
+                            type="hidden"
+                            name="tipdoc"
+                            value="{{ tipdoc }}"
+                          />
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="eliminar_pago"
+                          />
+                          <input
+                            type="hidden"
+                            name="remove_pago_idx"
+                            value="{{ loop.index0 }}"
+                          />
+                          <button class="btn btn--ghost" type="submit">
+                            Eliminar
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="5" class="muted">Sin pagos.</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+
+                <div style="height: 10px"></div>
+
+                <div class="grid" style="gap: 10px">
+                  <div class="col-6"><span class="muted">Cheques</span></div>
+                  <div class="col-6" style="text-align: right">
+                    <b>{{ inv.totales.cheques }}</b>
+                  </div>
+                  <div class="col-6"><span class="muted">Efectivo</span></div>
+                  <div class="col-6" style="text-align: right">
+                    <b>{{ inv.totales.efectivo }}</b>
+                  </div>
+                  <div class="col-6"><span class="muted">Tarjetas</span></div>
+                  <div class="col-6" style="text-align: right">
+                    <b>{{ inv.totales.tarjetas }}</b>
+                  </div>
+                  <div class="col-6"><span class="muted">Pagado</span></div>
+                  <div class="col-6" style="text-align: right">
+                    <b>{{ inv.totales.pagado }}</b>
+                  </div>
+                  <div class="col-6"><span class="muted">Cambio</span></div>
+                  <div class="col-6" style="text-align: right">
+                    <b>{{ inv.totales.cambio }}</b>
+                  </div>
+                </div>
+
+                <div style="height: 10px"></div>
+
+                <div class="factura-totales">
+                  <div><span class="muted">Sub - Total</span></div>
+                  <div style="text-align: right">
+                    <b>{{ inv.totales.subtotal }}</b>
+                  </div>
+                  <div><span class="muted">Des - Items</span></div>
+                  <div style="text-align: right">
+                    <b>{{ inv.totales.des_items }}</b>
+                  </div>
+                  <div><span class="muted">Base</span></div>
+                  <div style="text-align: right">
+                    <b>{{ inv.totales.base }}</b>
+                  </div>
+                  <div><span class="muted">Total Prod.</span></div>
+                  <div style="text-align: right">
+                    <b>{{ inv.totales.total_prod }}</b>
+                  </div>
+                  <div><span class="muted">IVA</span></div>
+                  <div style="text-align: right">
+                    <b>{{ inv.totales.iva }}</b>
+                  </div>
+                  <div><span class="muted">Neto</span></div>
+                  <div style="text-align: right">
+                    <b style="color: #ff4d4d">{{ inv.totales.neto }}</b>
+                  </div>
+                </div>
+
+                <div class="toolbar" style="margin-top: 12px">
+                  <div class="toolbar__left">
+                    <a
+                      class="btn btn--ghost"
+                      href="/facturacion/clave-confirmacion"
+                      >Confirmar Documento</a
+                    >
+                    <a
+                      class="btn btn--ghost"
+                      href="/facturacion/facturas?tipdoc={{ tipdoc }}"
+                      >Regresar</a
+                    >
+                  </div>
+                  <div class="toolbar__right">
+                    <form
+                      method="post"
+                      action="/facturacion/factura/nueva"
+                      style="display: inline"
+                    >
+                      <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
+                      <input type="hidden" name="action" value="limpiar" />
+                      <button
+                        id="btnLimpiar"
+                        class="btn btn--danger"
+                        type="submit"
+                      >
+                        Cancelar Documento
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                <form
+                  method="post"
+                  action="/facturacion/factura/nueva"
+                  style="display: none"
+                >
+                  <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
+                  <input type="hidden" name="action" value="limpiar" />
+                  <button id="btnCancelarDoc" type="submit">Cancelar</button>
+                </form>
+
+                <button
+                  id="btnConfirmarDoc"
+                  class="btn"
+                  type="button"
+                  style="display: none"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

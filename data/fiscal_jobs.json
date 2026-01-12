@@ -11,5 +11,31 @@
     },
     "result": null,
     "error": null
+  },
+  {
+    "id": "9af7a8dff9c84497992cfa484dea6b27",
+    "created_at": "2026-01-12T13:21:16Z",
+    "status": "pending",
+    "caja": "0001",
+    "job_type": "REPORT_ZX",
+    "payload": {
+      "report": "X",
+      "requested_by": "caja1"
+    },
+    "result": null,
+    "error": null
+  },
+  {
+    "id": "d7a7857e10d1449d86d402d04684e232",
+    "created_at": "2026-01-12T16:58:07Z",
+    "status": "pending",
+    "caja": "0001",
+    "job_type": "REPORT_ZX",
+    "payload": {
+      "report": "X",
+      "requested_by": "caja1"
+    },
+    "result": null,
+    "error": null
   }
 ]
