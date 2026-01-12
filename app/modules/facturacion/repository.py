@@ -121,3 +121,78 @@ class FacturacionRepository:
             except SQLAlchemyError as e2:
                 msg = str(getattr(getattr(e2, "orig", None), "args", None) or str(e2))
                 raise DatabaseUnavailable(f"Error al cargar facturas (sisadm): {msg}") from e2
+
+    def get_documento_header(self, *, numero: str, codigo: str) -> dict | None:
+        numero = (numero or "").strip()
+        codigo = (codigo or "").strip()
+        if not numero or not codigo:
+            return None
+
+        def _from_table(table: str) -> dict | None:
+            sql = text(
+                f"""
+                SELECT
+                  {table}.dcli_numero,
+                  {table}.dcli_codigo,
+                  admclientes.cli_nombre,
+                  {table}.dcli_fecha,
+                  {table}.dcli_tipdoc,
+                  {table}.dcli_codmon,
+                  {table}.dcli_numfis
+                FROM {table}
+                LEFT OUTER JOIN admclientes
+                  ON admclientes.cli_codigo = {table}.dcli_codigo
+                WHERE {table}.dcli_numero = :numero
+                  AND {table}.dcli_codigo = :codigo
+                LIMIT 1
+                """
+            )
+            with session_for(settings.db_sysadm) as s:
+                row = s.execute(sql, {"numero": numero, "codigo": codigo}).mappings().first()
+                return dict(row) if row else None
+
+        try:
+            return _from_table("admdoccli2")
+        except SQLAlchemyError:
+            try:
+                return _from_table("admdoccli")
+            except SQLAlchemyError as e2:
+                msg = str(getattr(getattr(e2, "orig", None), "args", None) or str(e2))
+                raise DatabaseUnavailable(f"Error al cargar documento (sisadm): {msg}") from e2
+
+    def list_items_factura_afectada(self, *, numero: str, codigo: str, tipdoc: str = "FAV") -> list[dict]:
+        numero = (numero or "").strip()
+        codigo = (codigo or "").strip()
+        tipdoc = (tipdoc or "FAV").strip().upper() or "FAV"
+        if not numero or not codigo:
+            return []
+
+        # Basado en Factura.itemsFac(...) del WinForms: adminvmov + adminv
+        sql = text(
+            """
+            SELECT
+              mov_item,
+              mov_codigo,
+              inv_descri AS colProducto,
+              mov_undmed,
+              TRUNCATE(mov_cant, 0) AS mov_cant,
+              mov_desc,
+              mov_precio,
+              mov_total,
+              TRUNCATE(mov_export, 0) AS mov_export
+            FROM adminvmov
+            LEFT JOIN adminv ON adminv.inv_codigo = adminvmov.mov_codigo
+            WHERE mov_docume = :numero
+              AND mov_codcta = :codigo
+              AND mov_tipdoc = :tipdoc
+            ORDER BY mov_item ASC
+            """
+        )
+
+        try:
+            with session_for(settings.db_sysadm) as s:
+                rows = s.execute(sql, {"numero": numero, "codigo": codigo, "tipdoc": tipdoc}).mappings().all()
+                return [dict(r) for r in rows]
+        except SQLAlchemyError as e:
+            msg = str(getattr(getattr(e, "orig", None), "args", None) or str(e))
+            raise DatabaseUnavailable(f"Error al cargar items de factura (sisadm): {msg}") from e

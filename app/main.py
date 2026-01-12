@@ -39,7 +39,7 @@ async def index(request: Request):
     menu = []
     if menu_map:
         try:
-            menu = MenuService().build_menu(str(menu_map))
+            menu = MenuService().build_menu(str(menu_map), user=user)
         except Exception:
             # Si falla el menú, mostramos menú vacío
             menu = []
@@ -64,7 +64,7 @@ async def open_form(request: Request, form: str = Query("")):
     menu = []
     if menu_map:
         try:
-            menu = MenuService().build_menu(str(menu_map))
+            menu = MenuService().build_menu(str(menu_map), user=user)
         except Exception:
             menu = []
 

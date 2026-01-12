@@ -319,13 +319,50 @@ def facturacion_clave_confirmacion_post(
 
 
 @router.get("/facturacion/importar-devolucion", response_class=HTMLResponse)
-def facturacion_importar_devolucion(request: Request, q: str | None = Query(None)):
+def facturacion_importar_devolucion(
+    request: Request,
+    q: str | None = Query(None),
+    ref_numero: str | None = Query(None),
+    ref_codigo: str | None = Query(None),
+    tipo: str | None = Query(None),
+):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
 
     menu = _load_menu(user)
     message = request.session.pop("flash", None)
+
+    error = None
+    ref = None
+    items = []
+
+    ref_numero_s = (ref_numero or "").strip() if ref_numero else ""
+    ref_codigo_s = (ref_codigo or "").strip() if ref_codigo else ""
+    tipo = (tipo or "Parcial").strip().title()
+    if tipo not in {"Parcial", "Total"}:
+        tipo = "Parcial"
+
+    if ref_numero_s and ref_codigo_s:
+        try:
+            repo = FacturacionRepository()
+            ref = repo.get_documento_header(numero=ref_numero_s, codigo=ref_codigo_s)
+            items = repo.list_items_factura_afectada(numero=ref_numero_s, codigo=ref_codigo_s, tipdoc="FAV")
+
+            def _to_int(v: object) -> int:
+                try:
+                    return int(float(str(v).strip()))
+                except Exception:
+                    return 0
+
+            for it in items:
+                cant = _to_int(it.get("mov_cant"))
+                exp = _to_int(it.get("mov_export"))
+                it["Saldo"] = max(0, cant - exp)
+        except DatabaseUnavailable as e:
+            error = str(e)
+        except Exception as e:
+            error = str(e)
 
     return templates.TemplateResponse(
         "facturacion/importar_devolucion.html",
@@ -336,8 +373,13 @@ def facturacion_importar_devolucion(request: Request, q: str | None = Query(None
             "active_href": "/facturacion/importar-devolucion",
             "title": "Importar Devolución - Lebrun",
             "message": message,
-            "error": None,
+            "error": error,
             "q": q,
+            "ref": ref,
+            "items": items,
+            "tipo": tipo,
+            "ref_numero": ref_numero_s,
+            "ref_codigo": ref_codigo_s,
         },
     )
 

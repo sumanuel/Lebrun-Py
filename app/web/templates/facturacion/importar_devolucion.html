@@ -1,57 +1,146 @@
-{% extends "base.html" %} {% block page_title %}Importar Devolución{% endblock
-%} {% block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block
-content %}
+{% extends "base.html" %}
+{% block page_title %}Importar Devolución{% endblock %}
+{% block sidebar %}{% include "_sidebar.html" %}{% endblock %}
+
+{% block content %}
 <div class="grid">
   <div class="col-12">
     <div class="card">
-      <div class="card__title">Importar Devolución</div>
+      <div class="card__title">Lebrun - Exportar Factura</div>
       <div class="card__body">
         {% if message %}
-        <div class="alert">{{ message }}</div>
-        {% endif %} {% if error %}
-        <div class="alert">{{ error }}</div>
+          <div class="alert">{{ message }}</div>
+        {% endif %}
+        {% if error %}
+          <div class="alert">{{ error }}</div>
         {% endif %}
 
-        <p class="muted">
-          Versión web inicial de <b>frmImportarDev</b>. En WinForms carga una
-          factura afectada y permite devolver parcial/total (con confirmación).
-        </p>
+        <div class="card" style="margin:0">
+          <div class="card__title" style="font-size: 13px">Datos Documento Destino</div>
+          <div class="card__body">
+            <form method="get" action="/facturacion/importar-devolucion" class="grid" style="gap: 10px">
+              <div class="col-3">
+                <label class="muted">Num Fac</label>
+                <input class="input" name="ref_numero" value="{{ ref_numero or '' }}" placeholder="000000..." />
+              </div>
+              <div class="col-3">
+                <label class="muted">Cliente</label>
+                <input class="input" name="ref_codigo" value="{{ ref_codigo or '' }}" placeholder="Código cliente" />
+              </div>
+              <div class="col-6">
+                <label class="muted">Nombre</label>
+                <input class="input" value="{{ ref.cli_nombre if ref else '' }}" readonly />
+              </div>
 
-        <div class="toolbar">
-          <div class="toolbar__left">
-            <form
-              method="get"
-              action="/facturacion/importar-devolucion"
-              class="toolbar__left"
-            >
-              <input
-                class="input"
-                type="search"
-                name="q"
-                placeholder="Buscar factura a afectar…"
-                value="{{ q or '' }}"
-                style="min-width: 320px"
-              />
-              <button class="btn" type="submit">Buscar</button>
+              <div class="col-3">
+                <label class="muted">Tipo Devolución</label>
+                <select class="input" name="tipo">
+                  <option value="Parcial" {% if tipo=='Parcial' %}selected{% endif %}>Parcial</option>
+                  <option value="Total" {% if tipo=='Total' %}selected{% endif %}>Total</option>
+                </select>
+              </div>
+              <div class="col-9" style="display:flex; align-items:end; gap: 10px">
+                <button class="btn" type="submit">Aceptar</button>
+                <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=FAV">Cancelar</a>
+                <a class="btn btn--ghost" href="/facturacion/clave-confirmacion">Requiere Supervisor</a>
+              </div>
             </form>
-          </div>
-          <div class="toolbar__right">
-            <a class="btn btn--ghost" href="/facturacion/clave-confirmacion"
-              >Requiere Supervisor</a
-            >
+
+            {% if ref and ref.dcli_numfis %}
+              <div style="margin-top: 10px" class="badge">Fiscal: {{ ref.dcli_numfis }}</div>
+            {% endif %}
           </div>
         </div>
 
-        <div class="code">
-          Próximo paso: seleccionar FAV (por caja) y cargar items, saldos
-          exportados, y luego generar DEV.
+        <div style="height: 10px"></div>
+
+        <div class="card" style="margin:0">
+          <div class="card__title" style="font-size: 13px">Items Factura</div>
+          <div class="card__body">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th style="text-align:right">Saldo</th>
+                  <th style="text-align:right">Cant</th>
+                  <th style="text-align:right">%Desc</th>
+                  <th>Und</th>
+                  <th style="text-align:right">Precio</th>
+                  <th style="text-align:right">Total</th>
+                  <th style="text-align:right">Exportado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in items %}
+                  <tr>
+                    <td>{{ it.mov_codigo }}</td>
+                    <td>{{ it.colProducto }}</td>
+                    <td style="text-align:right">{{ it.Saldo }}</td>
+                    <td style="text-align:right">{{ it.mov_cant }}</td>
+                    <td style="text-align:right">{{ it.mov_desc }}</td>
+                    <td>{{ it.mov_undmed }}</td>
+                    <td style="text-align:right">{{ it.mov_precio }}</td>
+                    <td style="text-align:right">{{ it.mov_total }}</td>
+                    <td style="text-align:right">{{ it.mov_export }}</td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="9" class="muted">
+                      Indique Num Fac + Cliente y presione Aceptar.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="actions" style="margin-top: 12px">
-          <a class="btn btn--ghost" href="/facturacion/facturas"
-            >Volver a Facturas</a
-          >
+        <div style="height: 10px"></div>
+
+        <div class="card" style="margin:0">
+          <div class="card__title" style="font-size: 13px">Items Reversados</div>
+          <div class="card__body">
+            <div class="grid" style="gap: 10px; margin-bottom: 10px">
+              <div class="col-4"><label class="muted">Producto</label><input class="input" placeholder="(doble click en Items Factura)" disabled /></div>
+              <div class="col-2"><label class="muted">Unidad</label><input class="input" placeholder="" disabled /></div>
+              <div class="col-2"><label class="muted">Cantidad</label><input class="input" placeholder="" disabled /></div>
+              <div class="col-4" style="display:flex; align-items:end; gap:10px">
+                <button class="btn btn--ghost" type="button" disabled>Aceptar</button>
+                <button class="btn btn--ghost" type="button" disabled>Eliminar Selección</button>
+              </div>
+            </div>
+
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Alm</th>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th>Und</th>
+                  <th style="text-align:right">Cant</th>
+                  <th style="text-align:right">Precio</th>
+                  <th style="text-align:right">%Desc</th>
+                  <th style="text-align:right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="9" class="muted">Pendiente: seleccionar items a reversar y generar DEV.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="toolbar" style="margin-top: 12px">
+              <div class="toolbar__right" style="gap: 10px">
+                <a class="btn btn--ghost" href="#" onclick="return false;" title="Pendiente" style="opacity: .6">Aceptar Devolución</a>
+                <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=FAV">Cancelar Devolución</a>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   </div>
