@@ -18,6 +18,7 @@ content %}
         </p>
 
         <form method="post" action="/facturacion/clave-confirmacion">
+          <input type="hidden" name="next" value="{{ next or '' }}" />
           <div class="form-row">
             <label class="label">Usuario supervisor</label>
             <input class="input" name="username" autocomplete="off" />

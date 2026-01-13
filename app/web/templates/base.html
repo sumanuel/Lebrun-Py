@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title or "Lebrun" }}</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    {% block extra_head %}{% endblock %}
   </head>
   <body>
     <div class="app-shell {% if hide_nav %}app-shell--no-nav{% endif %}">
@@ -89,5 +90,6 @@
     </div>
 
     <script src="/static/app.js"></script>
+    {% block extra_scripts %}{% endblock %}
   </body>
 </html>

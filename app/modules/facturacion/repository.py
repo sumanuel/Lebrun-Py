@@ -179,7 +179,8 @@ class FacturacionRepository:
               mov_desc,
               mov_precio,
               mov_total,
-              TRUNCATE(mov_export, 0) AS mov_export
+                            TRUNCATE(mov_export, 0) AS mov_export,
+                            mov_vendedor
             FROM adminvmov
             LEFT JOIN adminv ON adminv.inv_codigo = adminvmov.mov_codigo
             WHERE mov_docume = :numero

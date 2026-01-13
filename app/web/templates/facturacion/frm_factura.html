@@ -1,8 +1,68 @@
 {% extends "base.html" %} {% block page_title %}Factura{% endblock %} {% block
-sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block content %} {% set
-tipdoc = inv["tipdoc"] if inv else 'FAV' %} {% set titulo_doc = 'Factura de
-Venta' if tipdoc=='FAV' else ('Devolución de Venta' if tipdoc=='DEV' else 'Nota
-de Débito') %}
+sidebar %}{% include "_sidebar.html" %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .lookup-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 9999;
+  }
+  .lookup-modal.is-open {
+    display: block;
+  }
+  .lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  .lookup-modal__dialog {
+    position: relative;
+    margin: 40px auto;
+    max-width: 900px;
+    width: calc(100% - 24px);
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .lookup-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .lookup-modal__title {
+    font-weight: 700;
+  }
+  .lookup-modal__body {
+    padding: 12px 14px;
+  }
+  .lookup-modal__toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 10px;
+  }
+  .lookup-modal__results {
+    max-height: 55vh;
+    overflow: auto;
+  }
+  .lookup-row {
+    cursor: pointer;
+  }
+  .lookup-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set tipdoc = inv["tipdoc"] if inv else 'FAV' %}
+{% set titulo_doc = 'Factura de Venta' if tipdoc=='FAV' else ('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %}
 
 <div class="grid">
   <div class="col-12">
@@ -40,25 +100,48 @@ de Débito') %}
               <div class="card__title" style="font-size: 13px">Datos</div>
               <div class="card__body">
                 <form
+                  id="formDatos"
                   method="post"
                   action="/facturacion/factura/nueva"
                   class="grid"
                   style="gap: 10px"
                 >
                   <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
-                  <input type="hidden" name="action" value="buscar_cliente" />
 
                   <div class="col-4">
                     <label class="muted">Cliente</label>
-                    <input class="input" name="cli_codigo" value="{{
-                    inv["cliente"]["codigo"] }}" placeholder="Código" />
+                    <input
+                      id="cli_codigo"
+                      class="input"
+                      name="cli_codigo"
+                      value="{{ inv["cliente"]["codigo"] }}"
+                      placeholder="Código"
+                      autocomplete="off"
+                    />
                   </div>
-                  <div class="col-1" style="display: flex; align-items: end">
-                    <button class="btn btn--ghost" type="submit" title="Buscar">
+                  <div
+                    class="col-2"
+                    style="display: flex; align-items: end; gap: 8px"
+                  >
+                    <button
+                      class="btn btn--ghost"
+                      type="submit"
+                      name="action"
+                      value="buscar_cliente"
+                      title="Buscar cliente"
+                    >
                       🔎
                     </button>
+                    <button
+                      class="btn btn--ghost"
+                      type="button"
+                      onclick="openLookup('clientes')"
+                      title="Buscar en lista"
+                    >
+                      Lista
+                    </button>
                   </div>
-                  <div class="col-3">
+                  <div class="col-2">
                     <label class="muted">RIF</label>
                     <input class="input" value="{{ inv["cliente"]["rif"] }}"
                     readonly />
@@ -70,13 +153,56 @@ de Débito') %}
 
                   <div class="col-4">
                     <label class="muted">Vend</label>
-                    <input class="input" value="{{ inv["vendedor"]["codigo"] }}"
-                    placeholder="(pendiente)" />
+                    <input
+                      id="vend_codigo"
+                      class="input"
+                      name="vend_codigo"
+                      value="{{ inv["vendedor"]["codigo"] }}"
+                      placeholder="Código"
+                      maxlength="10"
+                      autocomplete="off"
+                    />
                   </div>
-                  <div class="col-8">
-                    <label class="muted">Nombre</label>
-                    <input class="input" value="{{ inv["cliente"]["nombre"] }}"
-                    readonly />
+                  <div
+                    class="col-2"
+                    style="display: flex; align-items: end; gap: 8px"
+                  >
+                    <button
+                      class="btn btn--ghost"
+                      type="submit"
+                      name="action"
+                      value="buscar_vendedor"
+                      title="Buscar vendedor"
+                    >
+                      🔎
+                    </button>
+                    <button
+                      class="btn btn--ghost"
+                      type="button"
+                      onclick="openLookup('vendedores')"
+                      title="Buscar en lista"
+                    >
+                      Lista
+                    </button>
+                  </div>
+                  <div class="col-6">
+                    <label class="muted">Vendedor</label>
+                    <input
+                      id="vend_nombre"
+                      class="input"
+                      value="{{ inv["vendedor"]["nombre"] }}"
+                      placeholder="(resuelve al buscar)"
+                      readonly
+                    />
+                  </div>
+
+                  <div class="col-12">
+                    <label class="muted">Cliente</label>
+                    <input
+                      class="input"
+                      value="{{ inv["cliente"]["nombre"] }}"
+                      readonly
+                    />
                   </div>
 
                   <div class="col-12">
@@ -94,47 +220,82 @@ de Débito') %}
               </div>
               <div class="card__body">
                 <form
+                  id="formProducto"
                   method="post"
                   action="/facturacion/factura/nueva"
                   class="grid"
                   style="gap: 10px"
                 >
                   <input type="hidden" name="tipdoc" value="{{ tipdoc }}" />
-                  <input type="hidden" name="action" value="agregar_item" />
 
                   <div class="col-4">
                     <label class="muted">Producto</label>
                     <input
+                      id="prod_codigo"
                       class="input"
                       name="prod_codigo"
-                      value=""
+                      value="{{ inv["producto"]["codigo"] }}"
                       placeholder="Código"
+                      maxlength="15"
+                      autocomplete="off"
                     />
                   </div>
-                  <div class="col-5">
+                  <div
+                    class="col-2"
+                    style="display: flex; align-items: end; gap: 8px"
+                  >
+                    <button
+                      class="btn btn--ghost"
+                      type="submit"
+                      name="action"
+                      value="buscar_producto"
+                      title="Buscar producto"
+                    >
+                      🔎
+                    </button>
+                    <button
+                      class="btn btn--ghost"
+                      type="button"
+                      onclick="openLookup('productos')"
+                      title="Buscar en lista"
+                    >
+                      Lista
+                    </button>
+                  </div>
+                  <div class="col-4">
                     <label class="muted">Nombre</label>
                     <input
+                      id="prod_nombre"
                       class="input"
-                      value=""
+                      value="{{ inv["producto"]["nombre"] }}"
                       placeholder="(auto al agregar)"
                       readonly
                     />
                   </div>
-                  <div class="col-3">
+                  <div class="col-2">
                     <label class="muted">Unidad</label>
-                    <input class="input" value="" placeholder="" readonly />
+                    <input
+                      class="input"
+                      value="{{ inv["producto"]["unidad"] }}"
+                      placeholder=""
+                      readonly
+                    />
                   </div>
 
                   <div class="col-3">
                     <label class="muted">Cantidad</label>
-                    <input class="input" name="prod_cantidad" value="1" />
+                    <input
+                      class="input"
+                      name="prod_cantidad"
+                      value="{{ inv["producto"]["cantidad"] or '1' }}"
+                    />
                   </div>
                   <div class="col-3">
                     <label class="muted">Precio</label>
                     <input
                       class="input"
                       name="prod_precio"
-                      value=""
+                      value="{{ inv["producto"]["precio"] }}"
                       placeholder="(usa lista A)"
                     />
                   </div>
@@ -146,7 +307,14 @@ de Débito') %}
                     class="col-3"
                     style="display: flex; align-items: end; gap: 8px"
                   >
-                    <button class="btn" type="submit">Agregar</button>
+                    <button
+                      class="btn"
+                      type="submit"
+                      name="action"
+                      value="agregar_item"
+                    >
+                      Agregar
+                    </button>
                     <a
                       class="btn btn--ghost"
                       href="/ventas/visor-precios"
@@ -224,6 +392,7 @@ de Débito') %}
               </div>
               <div class="card__body">
                 <form
+                  id="formPago"
                   method="post"
                   action="/facturacion/factura/nueva"
                   class="grid"
@@ -248,11 +417,23 @@ de Débito') %}
 
                   <div class="col-6">
                     <label class="muted">Banco</label>
-                    <input
-                      class="input"
-                      name="pago_banco"
-                      placeholder="(pendiente catálogo)"
-                    />
+                    <div style="display: flex; gap: 8px">
+                      <input
+                        id="pago_banco"
+                        class="input"
+                        name="pago_banco"
+                        placeholder="Código"
+                        autocomplete="off"
+                      />
+                      <button
+                        class="btn btn--ghost"
+                        type="button"
+                        onclick="openLookup('bancos')"
+                        title="Buscar banco"
+                      >
+                        Lista
+                      </button>
+                    </div>
                   </div>
                   <div class="col-6">
                     <label class="muted">N° / Ref</label>
@@ -267,7 +448,9 @@ de Débito') %}
                     class="col-6"
                     style="display: flex; align-items: end; gap: 8px"
                   >
-                    <button class="btn" type="submit">Agregar</button>
+                    <button class="btn" type="submit">
+                      Agregar
+                    </button>
                     <a
                       class="btn btn--ghost"
                       href="#"
@@ -443,4 +626,271 @@ de Débito') %}
     </div>
   </div>
 </div>
+
+<div class="lookup-modal" id="lookupModal" aria-hidden="true">
+  <div class="lookup-modal__backdrop" onclick="closeLookup()"></div>
+  <div class="lookup-modal__dialog" role="dialog" aria-modal="true">
+    <div class="lookup-modal__header">
+      <div class="lookup-modal__title" id="lookupTitle">Buscar</div>
+      <button class="btn btn--ghost" type="button" onclick="closeLookup()">
+        Cerrar
+      </button>
+    </div>
+    <div class="lookup-modal__body">
+      <div class="lookup-modal__toolbar">
+        <div style="flex: 1">
+          <label class="muted">Buscar</label>
+          <input
+            id="lookupQuery"
+            class="input"
+            placeholder="Escriba para buscar..."
+            autocomplete="off"
+          />
+        </div>
+        <div id="lookupByWrap" style="display: none">
+          <label class="muted">Por</label>
+          <select id="lookupBy" class="input">
+            <option value="descripcion">Descripción</option>
+            <option value="codigo">Código</option>
+            <option value="grupo">Grupo</option>
+          </select>
+        </div>
+        <div>
+          <button class="btn" type="button" onclick="runLookup()">
+            Buscar
+          </button>
+        </div>
+      </div>
+
+      <div class="lookup-modal__results">
+        <table class="table">
+          <thead>
+            <tr id="lookupHeaderRow"></tr>
+          </thead>
+          <tbody id="lookupBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let lookupType = null;
+
+  function zpadClient(value, len) {
+    const s = String(value || "").trim();
+    if (!s) return "";
+    if (!/^\d+$/.test(s)) return s;
+    return s.padStart(len, "0");
+  }
+
+  function submitAction(formEl, actionValue) {
+    if (!formEl) return;
+    const existing = formEl.querySelector('input[name="action"]');
+    if (existing) existing.remove();
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "action";
+    input.value = actionValue;
+    formEl.appendChild(input);
+    formEl.submit();
+  }
+
+  function openLookup(type) {
+    lookupType = type;
+    document.getElementById("lookupModal").classList.add("is-open");
+    document.getElementById("lookupModal").setAttribute("aria-hidden", "false");
+    document.getElementById("lookupQuery").value = "";
+
+    const byWrap = document.getElementById("lookupByWrap");
+    byWrap.style.display = type === "productos" ? "block" : "none";
+
+    const titleMap = {
+      clientes: "Buscar Clientes",
+      vendedores: "Buscar Vendedores",
+      productos: "Buscar Productos",
+      bancos: "Buscar Bancos",
+    };
+    document.getElementById("lookupTitle").innerText = titleMap[type] || "Buscar";
+
+    renderLookupHeader();
+    runLookup();
+    setTimeout(() => document.getElementById("lookupQuery").focus(), 0);
+  }
+
+  function closeLookup() {
+    document.getElementById("lookupModal").classList.remove("is-open");
+    document.getElementById("lookupModal").setAttribute("aria-hidden", "true");
+    lookupType = null;
+  }
+
+  function renderLookupHeader() {
+    const header = document.getElementById("lookupHeaderRow");
+    header.innerHTML = "";
+
+    const colsByType = {
+      clientes: ["Código", "Nombre", "RIF"],
+      vendedores: ["Código", "Nombre"],
+      productos: ["Código", "Descripción", "Unidad", "Precio"],
+      bancos: ["Código", "Nombre"],
+    };
+    const cols = colsByType[lookupType] || ["Resultado"];
+    for (const c of cols) {
+      const th = document.createElement("th");
+      th.innerText = c;
+      header.appendChild(th);
+    }
+  }
+
+  async function runLookup() {
+    const q = document.getElementById("lookupQuery").value.trim();
+    const by = document.getElementById("lookupBy").value;
+
+    let url = null;
+    if (lookupType === "clientes") url = `/api/lookups/clientes?q=${encodeURIComponent(q)}`;
+    if (lookupType === "vendedores") url = `/api/lookups/vendedores?q=${encodeURIComponent(q)}`;
+    if (lookupType === "productos") url = `/api/lookups/productos?q=${encodeURIComponent(q)}&by=${encodeURIComponent(by)}`;
+    if (lookupType === "bancos") url = `/api/lookups/bancos?q=${encodeURIComponent(q)}`;
+    if (!url) return;
+
+    const body = document.getElementById("lookupBody");
+    body.innerHTML = `<tr><td class="muted" colspan="6">Buscando...</td></tr>`;
+
+    try {
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const data = await res.json();
+      const items = (data && data.items) || [];
+      renderLookupRows(items);
+    } catch (e) {
+      body.innerHTML = `<tr><td class="muted" colspan="6">Error: ${String(e)}</td></tr>`;
+    }
+  }
+
+  function renderLookupRows(items) {
+    const body = document.getElementById("lookupBody");
+    body.innerHTML = "";
+    if (!items || !items.length) {
+      body.innerHTML = `<tr><td class="muted" colspan="6">Sin resultados.</td></tr>`;
+      return;
+    }
+
+    for (const item of items) {
+      const tr = document.createElement("tr");
+      tr.className = "lookup-row";
+      tr.addEventListener("click", () => applyLookupSelection(item));
+
+      if (lookupType === "clientes") {
+        tr.appendChild(td(item.cli_codigo));
+        tr.appendChild(td(item.cli_nombre));
+        tr.appendChild(td(item.cli_rif));
+      } else if (lookupType === "vendedores") {
+        tr.appendChild(td(item.ven_codigo));
+        tr.appendChild(td(item.ven_nombre));
+      } else if (lookupType === "productos") {
+        tr.appendChild(td(item.Codigo));
+        tr.appendChild(td(item.Descripcion));
+        tr.appendChild(td(item.Unidad));
+        tr.appendChild(td(item.Precio));
+      } else if (lookupType === "bancos") {
+        tr.appendChild(td(item.ban_codigo));
+        tr.appendChild(td(item.ban_nombre));
+      } else {
+        tr.appendChild(td(JSON.stringify(item)));
+      }
+
+      body.appendChild(tr);
+    }
+  }
+
+  function td(v) {
+    const cell = document.createElement("td");
+    cell.innerText = v == null ? "" : String(v);
+    return cell;
+  }
+
+  function applyLookupSelection(item) {
+    if (!lookupType) return;
+
+    if (lookupType === "clientes") {
+      const input = document.getElementById("cli_codigo");
+      input.value = String(item.cli_codigo || "").trim();
+      closeLookup();
+      submitAction(document.getElementById("formDatos"), "buscar_cliente");
+      return;
+    }
+
+    if (lookupType === "vendedores") {
+      const input = document.getElementById("vend_codigo");
+      input.value = zpadClient(String(item.ven_codigo || "").trim(), 10);
+      closeLookup();
+      submitAction(document.getElementById("formDatos"), "buscar_vendedor");
+      return;
+    }
+
+    if (lookupType === "productos") {
+      const input = document.getElementById("prod_codigo");
+      input.value = zpadClient(String(item.Codigo || "").trim(), 15);
+      closeLookup();
+      submitAction(document.getElementById("formProducto"), "buscar_producto");
+      return;
+    }
+
+    if (lookupType === "bancos") {
+      const input = document.getElementById("pago_banco");
+      input.value = String(item.ban_codigo || "").trim();
+      closeLookup();
+      return;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const lookupQuery = document.getElementById("lookupQuery");
+    lookupQuery.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runLookup();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeLookup();
+      }
+    });
+
+    const vend = document.getElementById("vend_codigo");
+    vend.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        vend.value = zpadClient(vend.value, 10);
+        submitAction(document.getElementById("formDatos"), "buscar_vendedor");
+      }
+    });
+    vend.addEventListener("blur", () => {
+      const padded = zpadClient(vend.value, 10);
+      if (padded !== vend.value) vend.value = padded;
+      const vendName = (document.getElementById("vend_nombre") || {}).value || "";
+      if (vend.value && !String(vendName).trim()) {
+        submitAction(document.getElementById("formDatos"), "buscar_vendedor");
+      }
+    });
+
+    const prod = document.getElementById("prod_codigo");
+    prod.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        prod.value = zpadClient(prod.value, 15);
+        submitAction(document.getElementById("formProducto"), "buscar_producto");
+      }
+    });
+    prod.addEventListener("blur", () => {
+      const padded = zpadClient(prod.value, 15);
+      if (padded !== prod.value) prod.value = padded;
+      const prodName = (document.getElementById("prod_nombre") || {}).value || "";
+      if (prod.value && !String(prodName).trim()) {
+        submitAction(document.getElementById("formProducto"), "buscar_producto");
+      }
+    });
+  });
+</script>
 {% endblock %}

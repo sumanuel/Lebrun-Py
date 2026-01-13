@@ -34,7 +34,7 @@
 
               <div class="col-3">
                 <label class="muted">Tipo Devolución</label>
-                <select class="input" name="tipo">
+                <select class="input" name="tipo" {% if locked %}disabled{% endif %}>
                   <option value="Parcial" {% if tipo=='Parcial' %}selected{% endif %}>Parcial</option>
                   <option value="Total" {% if tipo=='Total' %}selected{% endif %}>Total</option>
                 </select>
@@ -42,7 +42,15 @@
               <div class="col-9" style="display:flex; align-items:end; gap: 10px">
                 <button class="btn" type="submit">Aceptar</button>
                 <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=FAV">Cancelar</a>
-                <a class="btn btn--ghost" href="/facturacion/clave-confirmacion">Requiere Supervisor</a>
+                {% if tipo=='Total' and ref_numero and ref_codigo and not locked %}
+                  <form method="post" action="/facturacion/importar-devolucion" style="display:inline">
+                    <input type="hidden" name="action" value="procesar_total" />
+                    <input type="hidden" name="ref_numero" value="{{ ref_numero }}" />
+                    <input type="hidden" name="ref_codigo" value="{{ ref_codigo }}" />
+                    <input type="hidden" name="tipo" value="{{ tipo }}" />
+                    <button class="btn btn--ghost" type="submit">Procesar Total</button>
+                  </form>
+                {% endif %}
               </div>
             </form>
 
@@ -69,11 +77,12 @@
                   <th style="text-align:right">Precio</th>
                   <th style="text-align:right">Total</th>
                   <th style="text-align:right">Exportado</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {% for it in items %}
-                  <tr>
+                  <tr class="row-click" data-select="{{ it.mov_codigo }}">
                     <td>{{ it.mov_codigo }}</td>
                     <td>{{ it.colProducto }}</td>
                     <td style="text-align:right">{{ it.Saldo }}</td>
@@ -83,10 +92,22 @@
                     <td style="text-align:right">{{ it.mov_precio }}</td>
                     <td style="text-align:right">{{ it.mov_total }}</td>
                     <td style="text-align:right">{{ it.mov_export }}</td>
+                    <td style="text-align:right">
+                      {% if not locked %}
+                        <form method="post" action="/facturacion/importar-devolucion" style="display:inline">
+                          <input type="hidden" name="action" value="select_item" />
+                          <input type="hidden" name="ref_numero" value="{{ ref_numero }}" />
+                          <input type="hidden" name="ref_codigo" value="{{ ref_codigo }}" />
+                          <input type="hidden" name="tipo" value="{{ tipo }}" />
+                          <input type="hidden" name="sel_codigo" value="{{ it.mov_codigo }}" />
+                          <button class="btn btn--ghost" type="submit">Seleccionar</button>
+                        </form>
+                      {% endif %}
+                    </td>
                   </tr>
                 {% else %}
                   <tr>
-                    <td colspan="9" class="muted">
+                    <td colspan="10" class="muted">
                       Indique Num Fac + Cliente y presione Aceptar.
                     </td>
                   </tr>
@@ -102,13 +123,35 @@
           <div class="card__title" style="font-size: 13px">Items Reversados</div>
           <div class="card__body">
             <div class="grid" style="gap: 10px; margin-bottom: 10px">
-              <div class="col-4"><label class="muted">Producto</label><input class="input" placeholder="(doble click en Items Factura)" disabled /></div>
-              <div class="col-2"><label class="muted">Unidad</label><input class="input" placeholder="" disabled /></div>
-              <div class="col-2"><label class="muted">Cantidad</label><input class="input" placeholder="" disabled /></div>
-              <div class="col-4" style="display:flex; align-items:end; gap:10px">
-                <button class="btn btn--ghost" type="button" disabled>Aceptar</button>
-                <button class="btn btn--ghost" type="button" disabled>Eliminar Selección</button>
-              </div>
+              <form method="post" action="/facturacion/importar-devolucion" class="grid" style="gap:10px; width:100%">
+                <input type="hidden" name="action" value="add_reversado" />
+                <input type="hidden" name="ref_numero" value="{{ ref_numero }}" />
+                <input type="hidden" name="ref_codigo" value="{{ ref_codigo }}" />
+                <input type="hidden" name="tipo" value="{{ tipo }}" />
+
+                <div class="col-5">
+                  <label class="muted">Producto</label>
+                  <input class="input" name="sel_codigo" value="{{ selected_codigo or '' }}" placeholder="(seleccione en Items Factura)" {% if locked %}readonly{% endif %} />
+                  {% if selected_item %}
+                    <div class="muted" style="font-size: 12px; margin-top: 6px">{{ selected_item.colProducto }} ({{ selected_item.mov_undmed }})</div>
+                  {% endif %}
+                </div>
+                <div class="col-3">
+                  <label class="muted">Cantidad</label>
+                  <input class="input" name="cant" value="" placeholder="0" {% if locked %}disabled{% endif %} />
+                </div>
+                <div class="col-2" style="display:flex; align-items:end; gap:10px">
+                  <button class="btn" type="submit" {% if locked %}disabled{% endif %}>Agregar</button>
+                </div>
+              </form>
+
+              <form method="post" action="/facturacion/importar-devolucion" class="col-2" style="display:flex; align-items:end">
+                <input type="hidden" name="action" value="reset" />
+                <input type="hidden" name="ref_numero" value="{{ ref_numero }}" />
+                <input type="hidden" name="ref_codigo" value="{{ ref_codigo }}" />
+                <input type="hidden" name="tipo" value="{{ tipo }}" />
+                <button class="btn btn--ghost" type="submit" {% if locked %}disabled{% endif %}>Reset</button>
+              </form>
             </div>
 
             <table class="table">
@@ -126,15 +169,47 @@
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colspan="9" class="muted">Pendiente: seleccionar items a reversar y generar DEV.</td>
-                </tr>
+                {% for r in reversados %}
+                  <tr>
+                    <td>{{ r.mov_item }}</td>
+                    <td class="muted">—</td>
+                    <td>{{ r.codigo }}</td>
+                    <td>{{ r.producto }}</td>
+                    <td>{{ r.und }}</td>
+                    <td style="text-align:right">{{ r.cant }}</td>
+                    <td style="text-align:right">{{ r.precio }}</td>
+                    <td style="text-align:right">{{ r.des }}</td>
+                    <td style="text-align:right">
+                      {{ r.total }}
+                      {% if not locked %}
+                        <form method="post" action="/facturacion/importar-devolucion" style="display:inline; margin-left: 6px">
+                          <input type="hidden" name="action" value="remove_reversado" />
+                          <input type="hidden" name="ref_numero" value="{{ ref_numero }}" />
+                          <input type="hidden" name="ref_codigo" value="{{ ref_codigo }}" />
+                          <input type="hidden" name="tipo" value="{{ tipo }}" />
+                          <input type="hidden" name="del_codigo" value="{{ r.codigo }}" />
+                          <button class="btn btn--ghost" type="submit">Quitar</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="9" class="muted">Sin items reversados.</td>
+                  </tr>
+                {% endfor %}
               </tbody>
             </table>
 
             <div class="toolbar" style="margin-top: 12px">
               <div class="toolbar__right" style="gap: 10px">
-                <a class="btn btn--ghost" href="#" onclick="return false;" title="Pendiente" style="opacity: .6">Aceptar Devolución</a>
+                <form method="post" action="/facturacion/importar-devolucion" style="display:inline">
+                  <input type="hidden" name="action" value="aceptar_devolucion" />
+                  <input type="hidden" name="ref_numero" value="{{ ref_numero }}" />
+                  <input type="hidden" name="ref_codigo" value="{{ ref_codigo }}" />
+                  <input type="hidden" name="tipo" value="{{ tipo }}" />
+                  <button class="btn" type="submit">Aceptar Devolución</button>
+                </form>
                 <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=FAV">Cancelar Devolución</a>
               </div>
             </div>
@@ -145,4 +220,36 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Doble click en una fila = seleccionar item (similar WinForms)
+  document.querySelectorAll("tr.row-click").forEach((tr) => {
+    tr.addEventListener("dblclick", () => {
+      const code = tr.getAttribute("data-select");
+      if (!code) return;
+      const form = document.createElement("form");
+      form.method = "post";
+      form.action = "/facturacion/importar-devolucion";
+
+      const fields = {
+        action: "select_item",
+        ref_numero: "{{ ref_numero or '' }}",
+        ref_codigo: "{{ ref_codigo or '' }}",
+        tipo: "{{ tipo or 'Parcial' }}",
+        sel_codigo: code,
+      };
+      Object.keys(fields).forEach((k) => {
+        const i = document.createElement("input");
+        i.type = "hidden";
+        i.name = k;
+        i.value = fields[k];
+        form.appendChild(i);
+      });
+      document.body.appendChild(form);
+      form.submit();
+    });
+  });
+</script>
 {% endblock %}

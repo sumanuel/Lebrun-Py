@@ -33,3 +33,25 @@ class ClientesRepository:
                 return dict(row) if row else None
         except SQLAlchemyError as e:
             raise DatabaseUnavailable("Error al cargar cliente (sisadm).") from e
+
+    def search(self, *, q: str | None, limit: int = 50) -> list[dict]:
+        q = (q or "").strip()
+        limit = max(1, min(int(limit or 50), 200))
+        if not q:
+            return []
+
+        sql = text(
+            """
+            SELECT cli_codigo, cli_rif, cli_nombre, cli_direcc
+            FROM admclientes
+            WHERE cli_codigo LIKE :term OR cli_nombre LIKE :term
+            LIMIT :limit
+            """
+        )
+
+        try:
+            with session_for(settings.db_sysadm) as s:
+                rows = s.execute(sql, {"term": f"%{q}%", "limit": limit}).mappings().all()
+                return [dict(r) for r in rows]
+        except SQLAlchemyError as e:
+            raise DatabaseUnavailable("Error al buscar clientes (sisadm).") from e

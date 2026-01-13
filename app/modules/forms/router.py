@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
 from app.core.exceptions import DatabaseUnavailable
 from app.modules.clientes.repository import ClientesRepository
+from app.modules.bancos.repository import BancosRepository
 from app.modules.facturacion.repository import FacturacionRepository
 from app.modules.facturacion.factura_session import (
     add_item,
@@ -17,8 +19,20 @@ from app.modules.facturacion.factura_session import (
     remove_item,
     remove_pago,
 )
+from app.modules.facturacion.importdev_session import (
+    add_reversado,
+    can_total as importdev_can_total,
+    clear as importdev_clear,
+    init_state as importdev_init_state,
+    load_items as importdev_load_items,
+    remove_reversado as importdev_remove_reversado,
+    select_item as importdev_select_item,
+    total_fill as importdev_total_fill,
+    zpad,
+)
 from app.modules.fiscal.service import FiscalService
 from app.modules.menu.service import MenuService
+from app.modules.vendedores.repository import VendedoresRepository
 from app.modules.ventas.repository import VentasRepository
 
 router = APIRouter(tags=["forms"])
@@ -41,6 +55,66 @@ def _load_menu(user: dict) -> list[dict]:
         except Exception:
             menu = []
     return menu
+
+
+def _get_importdev_state(request: Request) -> dict | None:
+    st = request.session.get("importdev")
+    return st if isinstance(st, dict) else None
+
+
+def _set_importdev_state(request: Request, state: dict) -> None:
+    request.session["importdev"] = state
+
+
+def _ensure_importdev_loaded(
+    *,
+    request: Request,
+    ref_numero: str,
+    ref_codigo: str,
+    tipo: str,
+) -> tuple[dict, dict | None, str | None]:
+    """Inicializa/carga la devolución desde DB a sesión.
+
+    Devuelve: (state, ref, error)
+    """
+
+    tipo = (tipo or "Parcial").strip().title()
+    if tipo not in {"Parcial", "Total"}:
+        tipo = "Parcial"
+
+    state = _get_importdev_state(request)
+    if not state or (state.get("ref") or {}).get("numero") != ref_numero or (state.get("ref") or {}).get("codigo") != ref_codigo:
+        state = importdev_init_state(ref_numero=ref_numero, ref_codigo=ref_codigo, tipo=tipo)
+
+    if not state.get("locked"):
+        state["tipo"] = tipo
+
+    error: str | None = None
+    ref: dict | None = None
+
+    try:
+        repo = FacturacionRepository()
+        ref = repo.get_documento_header(numero=ref_numero, codigo=ref_codigo)
+        items = repo.list_items_factura_afectada(numero=ref_numero, codigo=ref_codigo, tipdoc="FAV")
+        importdev_load_items(state, items)
+        state["ref"]["numero"] = ref_numero
+        state["ref"]["codigo"] = ref_codigo
+        state["ref"]["numfis"] = str((ref or {}).get("dcli_numfis") or "")
+
+        # Vendor de la factura afectada: tomamos el primero (en WinForms viene de facDev.VendedorFactura).
+        vend = ""
+        for it in items or []:
+            vend = str(it.get("mov_vendedor") or "").strip()
+            if vend:
+                break
+        state["ref"]["vendedor"] = vend
+    except DatabaseUnavailable as e:
+        error = str(e)
+    except Exception as e:
+        error = str(e)
+
+    _set_importdev_state(request, state)
+    return state, ref, error
 
 
 def _render_form_page(request: Request, title: str, description: str):
@@ -277,7 +351,7 @@ def facturacion_cierre_caja_post(request: Request):
 
 
 @router.get("/facturacion/clave-confirmacion", response_class=HTMLResponse)
-def facturacion_clave_confirmacion(request: Request):
+def facturacion_clave_confirmacion(request: Request, next: str | None = Query(None)):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
@@ -295,6 +369,7 @@ def facturacion_clave_confirmacion(request: Request):
             "title": "Clave de Confirmación - Lebrun",
             "message": message,
             "error": None,
+            "next": next or "",
         },
     )
 
@@ -304,6 +379,7 @@ def facturacion_clave_confirmacion_post(
     request: Request,
     username: str = Form(""),
     password: str = Form(""),
+    next: str = Form(""),
 ):
     user, redirect = _require_user(request)
     if redirect:
@@ -314,7 +390,13 @@ def facturacion_clave_confirmacion_post(
         request.session["flash"] = "Debe indicar usuario y contraseña."
         return RedirectResponse(url="/facturacion/clave-confirmacion", status_code=303)
 
-    request.session["flash"] = "Confirmación registrada (stub). Próximo paso: validar supervisor en sysconf + permisos."
+    # Marcador para flujos que requieren supervisor (ej: importar devolución Total)
+    request.session["importdev_supervisor_ok"] = True
+    request.session["importdev_supervisor_user"] = (username or "").strip()
+
+    request.session["flash"] = "Confirmación registrada (stub)."
+    if (next or "").strip():
+        return RedirectResponse(url=next.strip(), status_code=303)
     return RedirectResponse(url="/facturacion/clave-confirmacion", status_code=303)
 
 
@@ -333,36 +415,53 @@ def facturacion_importar_devolucion(
     menu = _load_menu(user)
     message = request.session.pop("flash", None)
 
-    error = None
-    ref = None
-    items = []
+    error: str | None = None
+    ref: dict | None = None
 
     ref_numero_s = (ref_numero or "").strip() if ref_numero else ""
     ref_codigo_s = (ref_codigo or "").strip() if ref_codigo else ""
-    tipo = (tipo or "Parcial").strip().title()
-    if tipo not in {"Parcial", "Total"}:
-        tipo = "Parcial"
+    tipo_norm = (tipo or "Parcial").strip().title()
+    if tipo_norm not in {"Parcial", "Total"}:
+        tipo_norm = "Parcial"
+
+    state = _get_importdev_state(request)
 
     if ref_numero_s and ref_codigo_s:
-        try:
-            repo = FacturacionRepository()
-            ref = repo.get_documento_header(numero=ref_numero_s, codigo=ref_codigo_s)
-            items = repo.list_items_factura_afectada(numero=ref_numero_s, codigo=ref_codigo_s, tipdoc="FAV")
+        state, ref, error = _ensure_importdev_loaded(
+            request=request,
+            ref_numero=ref_numero_s,
+            ref_codigo=ref_codigo_s,
+            tipo=tipo_norm,
+        )
+    else:
+        # Sin referencia: mostrar pantalla vacía.
+        if not state or (state.get("ref") or {}).get("numero") or (state.get("ref") or {}).get("codigo"):
+            state = importdev_init_state(ref_numero="", ref_codigo="", tipo=tipo_norm)
+            _set_importdev_state(request, state)
 
-            def _to_int(v: object) -> int:
-                try:
-                    return int(float(str(v).strip()))
-                except Exception:
-                    return 0
+    # Si venimos de una confirmación de supervisor para Total, ejecutar el equivalente a despuesConfirmacion(true,...)
+    if state and state.get("pending_total") and request.session.get("importdev_supervisor_ok"):
+        if not state.get("locked"):
+            if importdev_can_total(state):
+                importdev_total_fill(state)
+                state["locked"] = True
+            else:
+                request.session["flash"] = "No se puede Procesar la devolución Total!!"
+        state["pending_total"] = False
+        request.session.pop("importdev_supervisor_ok", None)
+        request.session.pop("importdev_supervisor_user", None)
+        _set_importdev_state(request, state)
 
-            for it in items:
-                cant = _to_int(it.get("mov_cant"))
-                exp = _to_int(it.get("mov_export"))
-                it["Saldo"] = max(0, cant - exp)
-        except DatabaseUnavailable as e:
-            error = str(e)
-        except Exception as e:
-            error = str(e)
+    items = (state.get("items") or []) if state else []
+    reversados = (state.get("reversados") or []) if state else []
+
+    selected_codigo = str((state or {}).get("selected_codigo") or "")
+    selected_item = None
+    if selected_codigo:
+        for it in items:
+            if str(it.get("mov_codigo") or "") == selected_codigo:
+                selected_item = it
+                break
 
     return templates.TemplateResponse(
         "facturacion/importar_devolucion.html",
@@ -377,11 +476,200 @@ def facturacion_importar_devolucion(
             "q": q,
             "ref": ref,
             "items": items,
-            "tipo": tipo,
+            "reversados": reversados,
+            "tipo": str((state or {}).get("tipo") or tipo_norm),
             "ref_numero": ref_numero_s,
             "ref_codigo": ref_codigo_s,
+            "locked": bool((state or {}).get("locked")),
+            "selected_codigo": selected_codigo,
+            "selected_item": selected_item,
         },
     )
+
+
+@router.post("/facturacion/importar-devolucion")
+def facturacion_importar_devolucion_post(
+    request: Request,
+    action: str = Form(""),
+    ref_numero: str = Form(""),
+    ref_codigo: str = Form(""),
+    tipo: str = Form("Parcial"),
+    sel_codigo: str = Form(""),
+    cant: str = Form(""),
+    del_codigo: str = Form(""),
+):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    ref_numero_s = (ref_numero or "").strip()
+    ref_codigo_s = (ref_codigo or "").strip()
+    tipo_norm = (tipo or "Parcial").strip().title()
+    if tipo_norm not in {"Parcial", "Total"}:
+        tipo_norm = "Parcial"
+
+    if not ref_numero_s or not ref_codigo_s:
+        request.session["flash"] = "Indique Num Fac + Cliente y presione Aceptar."
+        return RedirectResponse(url="/facturacion/importar-devolucion", status_code=303)
+
+    state, _ref, error = _ensure_importdev_loaded(
+        request=request,
+        ref_numero=ref_numero_s,
+        ref_codigo=ref_codigo_s,
+        tipo=tipo_norm,
+    )
+
+    if error:
+        request.session["flash"] = error
+        return RedirectResponse(
+            url=f"/facturacion/importar-devolucion?ref_numero={ref_numero_s}&ref_codigo={ref_codigo_s}&tipo={tipo_norm}",
+            status_code=303,
+        )
+
+    action = (action or "").strip().lower()
+
+    if action == "select_item":
+        if not state.get("locked"):
+            importdev_select_item(state, sel_codigo)
+
+    elif action == "add_reversado":
+        if state.get("locked"):
+            request.session["flash"] = "La devolución está bloqueada. Use Reset si necesita cambiar."
+        else:
+            codigo = (sel_codigo or "").strip() or str(state.get("selected_codigo") or "").strip()
+            try:
+                cantidad = int(float((cant or "0").strip() or "0"))
+            except Exception:
+                cantidad = 0
+            msg = add_reversado(state, codigo=codigo, cantidad=cantidad)
+            if msg:
+                request.session["flash"] = msg
+
+    elif action == "remove_reversado":
+        if not state.get("locked"):
+            importdev_remove_reversado(state, del_codigo)
+
+    elif action == "reset":
+        state = importdev_clear(state)
+
+    elif action == "procesar_total":
+        if state.get("locked"):
+            request.session["flash"] = "La devolución ya fue procesada."
+        else:
+            if not importdev_can_total(state):
+                request.session["flash"] = "No se puede Procesar la devolución Total!!"
+            else:
+                state["pending_total"] = True
+                _set_importdev_state(request, state)
+                next_url = f"/facturacion/importar-devolucion?ref_numero={ref_numero_s}&ref_codigo={ref_codigo_s}&tipo=Total"
+                return RedirectResponse(url=f"/facturacion/clave-confirmacion?next={next_url}", status_code=303)
+
+    elif action == "aceptar_devolucion":
+        if not (state.get("reversados") or []):
+            request.session["flash"] = "Debe agregar items a reversar."
+        else:
+            # Crear documento DEV en sesión usando la pantalla de factura.
+            inv = invoice_default("DEV")
+            # cliente
+            cli = ClientesRepository().get_cliente(codigo=ref_codigo_s)
+            if cli:
+                inv["cliente"] = {
+                    "codigo": str(cli.get("cli_codigo") or ""),
+                    "rif": str(cli.get("cli_rif") or ""),
+                    "nombre": str(cli.get("cli_nombre") or ""),
+                    "direccion": str(cli.get("cli_direcc") or ""),
+                }
+            # vendedor
+            vend_code = zpad(str((state.get("ref") or {}).get("vendedor") or ""), 10)
+            if vend_code:
+                vend = VendedoresRepository().get_vendedor(codigo=vend_code)
+                inv["vendedor"] = {"codigo": vend_code, "nombre": str((vend or {}).get("ven_nombre") or "")}
+
+            # referencia afectada (para mostrar y/o usar en guardar luego)
+            inv["afectada"] = {
+                "numero": ref_numero_s,
+                "codigo": ref_codigo_s,
+                "numfis": str((state.get("ref") or {}).get("numfis") or ""),
+            }
+
+            for r in state.get("reversados") or []:
+                add_item(
+                    inv,
+                    producto={
+                        "codigo": str(r.get("codigo") or ""),
+                        "descripcion": str(r.get("producto") or ""),
+                        "unidad": str(r.get("und") or ""),
+                    },
+                    cantidad=str(r.get("cant") or "0"),
+                    precio=str(r.get("precio") or "0"),
+                    desc_pct=str(r.get("des") or "0"),
+                )
+
+            recalc(inv)
+            request.session["factura"] = inv
+            request.session["flash"] = "Devolución preparada. Revise y confirme el documento."
+            return RedirectResponse(url="/facturacion/factura/nueva?tipdoc=DEV", status_code=303)
+
+    _set_importdev_state(request, state)
+    return RedirectResponse(
+        url=f"/facturacion/importar-devolucion?ref_numero={ref_numero_s}&ref_codigo={ref_codigo_s}&tipo={tipo_norm}",
+        status_code=303,
+    )
+
+
+@router.get("/api/lookups/clientes")
+def api_lookup_clientes(request: Request, q: str = Query("")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    q = (q or "").strip()
+    if not q:
+        return {"items": []}
+
+    try:
+        repo = ClientesRepository()
+        items = repo.search(q=q, limit=80)
+        return {"items": items}
+    except DatabaseUnavailable as e:
+        return JSONResponse({"error": str(e), "items": []}, status_code=503)
+
+
+@router.get("/api/lookups/vendedores")
+def api_lookup_vendedores(request: Request, q: str = Query("")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        items = VendedoresRepository().search(q=(q or "").strip(), limit=50)
+        return {"items": items}
+    except DatabaseUnavailable as e:
+        return JSONResponse({"error": str(e), "items": []}, status_code=503)
+
+
+@router.get("/api/lookups/productos")
+def api_lookup_productos(request: Request, q: str = Query(""), by: str = Query("descripcion")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    by = (by or "descripcion").strip().lower()
+    try:
+        rows = VentasRepository().list_productos(q=(q or "").strip() or None, by=by, limit=80)
+        return {"items": rows}
+    except DatabaseUnavailable as e:
+        return JSONResponse({"error": str(e), "items": []}, status_code=503)
+
+
+@router.get("/api/lookups/bancos")
+def api_lookup_bancos(request: Request, q: str = Query("")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        items = BancosRepository().search(q=(q or "").strip(), limit=80)
+        return {"items": items}
+    except DatabaseUnavailable as e:
+        return JSONResponse({"error": str(e), "items": []}, status_code=503)
 
 
 @router.get("/facturacion/factura/nueva", response_class=HTMLResponse)
@@ -424,6 +712,8 @@ def facturacion_factura_nueva_post(
     action: str = Form(""),
     # cliente
     cli_codigo: str = Form(""),
+    # vendedor
+    vend_codigo: str = Form(""),
     # producto
     prod_codigo: str = Form(""),
     prod_cantidad: str = Form("1"),
@@ -471,8 +761,39 @@ def facturacion_factura_nueva_post(
                         "nombre": str(row.get("cli_nombre") or ""),
                         "direccion": str(row.get("cli_direcc") or ""),
                     }
+        elif action == "buscar_vendedor":
+            vend_codigo = zpad((vend_codigo or "").strip(), 10)
+            if not vend_codigo:
+                message = "Indique un código de vendedor."
+            else:
+                row = VendedoresRepository().get_vendedor(codigo=vend_codigo)
+                if not row:
+                    message = f"Vendedor no encontrado: {vend_codigo}"
+                else:
+                    inv["vendedor"] = {
+                        "codigo": str(row.get("ven_codigo") or ""),
+                        "nombre": str(row.get("ven_nombre") or ""),
+                    }
+        elif action == "buscar_producto":
+            code = zpad((prod_codigo or "").strip(), 15)
+            if not code:
+                message = "Indique un código de producto."
+            else:
+                prod = VentasRepository().get_producto_by_codigo(codigo=code)
+                if not prod:
+                    message = f"Producto no encontrado: {code}"
+                    inv["producto"] = {"codigo": code, "nombre": "", "unidad": "", "cantidad": "1", "precio": ""}
+                else:
+                    inv["producto"] = {
+                        "codigo": str(prod.get("Codigo") or ""),
+                        "nombre": str(prod.get("Descripcion") or ""),
+                        "unidad": str(prod.get("Unidad") or ""),
+                        "cantidad": str((prod_cantidad or "1").strip() or "1"),
+                        "precio": str(prod.get("Precio") or ""),
+                    }
         elif action == "agregar_item":
-            code = (prod_codigo or "").strip()
+            code = (prod_codigo or "").strip() or str((inv.get("producto") or {}).get("codigo") or "").strip()
+            code = zpad(code, 15)
             if not code:
                 message = "Indique un código de producto."
             else:
