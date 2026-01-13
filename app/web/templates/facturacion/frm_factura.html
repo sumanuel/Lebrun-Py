@@ -1,7 +1,5 @@
 {% extends "base.html" %} {% block page_title %}Factura{% endblock %} {% block
-sidebar %}{% include "_sidebar.html" %}{% endblock %}
-
-{% block extra_head %}
+sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 <style>
   .lookup-modal {
     position: fixed;
@@ -57,12 +55,9 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
     background: rgba(255, 255, 255, 0.05);
   }
 </style>
-{% endblock %}
-
-{% block content %}
-
-{% set tipdoc = inv["tipdoc"] if inv else 'FAV' %}
-{% set titulo_doc = 'Factura de Venta' if tipdoc=='FAV' else ('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %}
+{% endblock %} {% block content %} {% set tipdoc = inv["tipdoc"] if inv else
+'FAV' %} {% set titulo_doc = 'Factura de Venta' if tipdoc=='FAV' else
+('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %}
 
 <div class="grid">
   <div class="col-12">
@@ -110,14 +105,9 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
 
                   <div class="col-4">
                     <label class="muted">Cliente</label>
-                    <input
-                      id="cli_codigo"
-                      class="input"
-                      name="cli_codigo"
-                      value="{{ inv["cliente"]["codigo"] }}"
-                      placeholder="Código"
-                      autocomplete="off"
-                    />
+                    <input id="cli_codigo" class="input" name="cli_codigo"
+                    value="{{ inv["cliente"]["codigo"] }}" placeholder="Código"
+                    autocomplete="off" />
                   </div>
                   <div
                     class="col-2"
@@ -153,15 +143,9 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
 
                   <div class="col-4">
                     <label class="muted">Vend</label>
-                    <input
-                      id="vend_codigo"
-                      class="input"
-                      name="vend_codigo"
-                      value="{{ inv["vendedor"]["codigo"] }}"
-                      placeholder="Código"
-                      maxlength="10"
-                      autocomplete="off"
-                    />
+                    <input id="vend_codigo" class="input" name="vend_codigo"
+                    value="{{ inv["vendedor"]["codigo"] }}" placeholder="Código"
+                    maxlength="10" autocomplete="off" />
                   </div>
                   <div
                     class="col-2"
@@ -187,22 +171,15 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
                   </div>
                   <div class="col-6">
                     <label class="muted">Vendedor</label>
-                    <input
-                      id="vend_nombre"
-                      class="input"
-                      value="{{ inv["vendedor"]["nombre"] }}"
-                      placeholder="(resuelve al buscar)"
-                      readonly
-                    />
+                    <input id="vend_nombre" class="input" value="{{
+                    inv["vendedor"]["nombre"] }}" placeholder="(resuelve al
+                    buscar)" readonly />
                   </div>
 
                   <div class="col-12">
                     <label class="muted">Cliente</label>
-                    <input
-                      class="input"
-                      value="{{ inv["cliente"]["nombre"] }}"
-                      readonly
-                    />
+                    <input class="input" value="{{ inv["cliente"]["nombre"] }}"
+                    readonly />
                   </div>
 
                   <div class="col-12">
@@ -230,15 +207,9 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
 
                   <div class="col-4">
                     <label class="muted">Producto</label>
-                    <input
-                      id="prod_codigo"
-                      class="input"
-                      name="prod_codigo"
-                      value="{{ inv["producto"]["codigo"] }}"
-                      placeholder="Código"
-                      maxlength="15"
-                      autocomplete="off"
-                    />
+                    <input id="prod_codigo" class="input" name="prod_codigo"
+                    value="{{ inv["producto"]["codigo"] }}" placeholder="Código"
+                    maxlength="15" autocomplete="off" />
                   </div>
                   <div
                     class="col-2"
@@ -264,40 +235,25 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
                   </div>
                   <div class="col-4">
                     <label class="muted">Nombre</label>
-                    <input
-                      id="prod_nombre"
-                      class="input"
-                      value="{{ inv["producto"]["nombre"] }}"
-                      placeholder="(auto al agregar)"
-                      readonly
-                    />
+                    <input id="prod_nombre" class="input" value="{{
+                    inv["producto"]["nombre"] }}" placeholder="(auto al
+                    agregar)" readonly />
                   </div>
                   <div class="col-2">
                     <label class="muted">Unidad</label>
-                    <input
-                      class="input"
-                      value="{{ inv["producto"]["unidad"] }}"
-                      placeholder=""
-                      readonly
-                    />
+                    <input class="input" value="{{ inv["producto"]["unidad"] }}"
+                    placeholder="" readonly />
                   </div>
 
                   <div class="col-3">
                     <label class="muted">Cantidad</label>
-                    <input
-                      class="input"
-                      name="prod_cantidad"
-                      value="{{ inv["producto"]["cantidad"] or '1' }}"
-                    />
+                    <input class="input" name="prod_cantidad" value="{{
+                    inv["producto"]["cantidad"] or '1' }}" />
                   </div>
                   <div class="col-3">
                     <label class="muted">Precio</label>
-                    <input
-                      class="input"
-                      name="prod_precio"
-                      value="{{ inv["producto"]["precio"] }}"
-                      placeholder="(usa lista A)"
-                    />
+                    <input class="input" name="prod_precio" value="{{
+                    inv["producto"]["precio"] }}" placeholder="(usa lista A)" />
                   </div>
                   <div class="col-3">
                     <label class="muted">%Desc</label>
@@ -448,9 +404,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
                     class="col-6"
                     style="display: flex; align-items: end; gap: 8px"
                   >
-                    <button class="btn" type="submit">
-                      Agregar
-                    </button>
+                    <button class="btn" type="submit">Agregar</button>
                     <a
                       class="btn btn--ghost"
                       href="#"
@@ -673,9 +627,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
+{% endblock %} {% block extra_scripts %}
 <script>
   let lookupType = null;
 
@@ -713,7 +665,8 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
       productos: "Buscar Productos",
       bancos: "Buscar Bancos",
     };
-    document.getElementById("lookupTitle").innerText = titleMap[type] || "Buscar";
+    document.getElementById("lookupTitle").innerText =
+      titleMap[type] || "Buscar";
 
     renderLookupHeader();
     runLookup();
@@ -749,22 +702,30 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
     const by = document.getElementById("lookupBy").value;
 
     let url = null;
-    if (lookupType === "clientes") url = `/api/lookups/clientes?q=${encodeURIComponent(q)}`;
-    if (lookupType === "vendedores") url = `/api/lookups/vendedores?q=${encodeURIComponent(q)}`;
-    if (lookupType === "productos") url = `/api/lookups/productos?q=${encodeURIComponent(q)}&by=${encodeURIComponent(by)}`;
-    if (lookupType === "bancos") url = `/api/lookups/bancos?q=${encodeURIComponent(q)}`;
+    if (lookupType === "clientes")
+      url = `/api/lookups/clientes?q=${encodeURIComponent(q)}`;
+    if (lookupType === "vendedores")
+      url = `/api/lookups/vendedores?q=${encodeURIComponent(q)}`;
+    if (lookupType === "productos")
+      url = `/api/lookups/productos?q=${encodeURIComponent(
+        q
+      )}&by=${encodeURIComponent(by)}`;
+    if (lookupType === "bancos")
+      url = `/api/lookups/bancos?q=${encodeURIComponent(q)}`;
     if (!url) return;
 
     const body = document.getElementById("lookupBody");
     body.innerHTML = `<tr><td class="muted" colspan="6">Buscando...</td></tr>`;
 
     try {
-      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
       const data = await res.json();
       const items = (data && data.items) || [];
       renderLookupRows(items);
     } catch (e) {
-      body.innerHTML = `<tr><td class="muted" colspan="6">Error: ${String(e)}</td></tr>`;
+      body.innerHTML = `<tr><td class="muted" colspan="6">Error: ${String(
+        e
+      )}</td></tr>`;
     }
   }
 
@@ -869,7 +830,8 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
     vend.addEventListener("blur", () => {
       const padded = zpadClient(vend.value, 10);
       if (padded !== vend.value) vend.value = padded;
-      const vendName = (document.getElementById("vend_nombre") || {}).value || "";
+      const vendName =
+        (document.getElementById("vend_nombre") || {}).value || "";
       if (vend.value && !String(vendName).trim()) {
         submitAction(document.getElementById("formDatos"), "buscar_vendedor");
       }
@@ -880,15 +842,22 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %}
       if (e.key === "Enter") {
         e.preventDefault();
         prod.value = zpadClient(prod.value, 15);
-        submitAction(document.getElementById("formProducto"), "buscar_producto");
+        submitAction(
+          document.getElementById("formProducto"),
+          "buscar_producto"
+        );
       }
     });
     prod.addEventListener("blur", () => {
       const padded = zpadClient(prod.value, 15);
       if (padded !== prod.value) prod.value = padded;
-      const prodName = (document.getElementById("prod_nombre") || {}).value || "";
+      const prodName =
+        (document.getElementById("prod_nombre") || {}).value || "";
       if (prod.value && !String(prodName).trim()) {
-        submitAction(document.getElementById("formProducto"), "buscar_producto");
+        submitAction(
+          document.getElementById("formProducto"),
+          "buscar_producto"
+        );
       }
     });
   });
