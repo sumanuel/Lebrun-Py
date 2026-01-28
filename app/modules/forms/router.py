@@ -354,7 +354,11 @@ def facturacion_cierre_caja_post(request: Request):
 
 
 @router.get("/facturacion/clave-confirmacion", response_class=HTMLResponse)
-def facturacion_clave_confirmacion(request: Request, next: str | None = Query(None)):
+def facturacion_clave_confirmacion(
+    request: Request,
+    next: str | None = Query(None),
+    scope: str | None = Query(None),
+):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
@@ -373,6 +377,7 @@ def facturacion_clave_confirmacion(request: Request, next: str | None = Query(No
             "message": message,
             "error": None,
             "next": next or "",
+            "scope": (scope or "").strip().lower(),
         },
     )
 
@@ -383,6 +388,7 @@ def facturacion_clave_confirmacion_post(
     username: str = Form(""),
     password: str = Form(""),
     next: str = Form(""),
+    scope: str = Form(""),
 ):
     user, redirect = _require_user(request)
     if redirect:
@@ -393,9 +399,15 @@ def facturacion_clave_confirmacion_post(
         request.session["flash"] = "Debe indicar usuario y contraseña."
         return RedirectResponse(url="/facturacion/clave-confirmacion", status_code=303)
 
-    # Marcador para flujos que requieren supervisor (ej: importar devolución Total)
-    request.session["importdev_supervisor_ok"] = True
-    request.session["importdev_supervisor_user"] = (username or "").strip()
+    scope_norm = (scope or "").strip().lower() or "importdev"
+
+    if scope_norm == "factura":
+        request.session["factura_supervisor_ok"] = True
+        request.session["factura_supervisor_user"] = (username or "").strip()
+    else:
+        # Marcador para flujos que requieren supervisor (ej: importar devolución Total)
+        request.session["importdev_supervisor_ok"] = True
+        request.session["importdev_supervisor_user"] = (username or "").strip()
 
     request.session["flash"] = "Confirmación registrada (stub)."
     if (next or "").strip():
@@ -688,6 +700,7 @@ def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
     if not isinstance(inv, dict):
         inv = invoice_default(tipdoc)
     inv["tipdoc"] = tipdoc
+    inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
     recalc(inv)
     request.session["factura"] = inv
 
@@ -743,6 +756,7 @@ def facturacion_factura_nueva_post(
     if not isinstance(inv, dict):
         inv = invoice_default(tipdoc)
     inv["tipdoc"] = tipdoc
+    inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
 
     action = (action or "").strip().lower()
     message: str | None = None
@@ -825,6 +839,13 @@ def facturacion_factura_nueva_post(
             modo = (pago_modo or "").strip() or "Efectivo"
             monto_raw = (pago_monto or "").strip()
 
+            inv["pago_form"] = {
+                "modo": modo,
+                "banco": (pago_banco or "").strip(),
+                "ref": (pago_ref or "").strip(),
+                "monto": monto_raw,
+            }
+
             if not monto_raw:
                 message = "El Monto Abonar no puede quedar Vacio!!"
             else:
@@ -837,17 +858,24 @@ def facturacion_factura_nueva_post(
                     requiere_banco = modo in {"Tarjeta de Debito", "Tarjeta de Credito", "Cheque"}
                     if requiere_banco and not (pago_banco or "").strip():
                         message = f"Para el Modo de pago {modo} el campo Banco no puede quedar Vacio!!"
-                    elif requiere_banco and not (pago_ref or "").strip():
-                        message = f"El Nº para el  Modo de pago {modo} no puede quedar Vacio!!"
                     else:
                         banco = (pago_banco or "").strip() if requiere_banco else "N/A"
                         referencia = (pago_ref or "").strip() if requiere_banco else "N/A"
                         add_pago(inv, modo=modo, banco=banco, referencia=referencia, monto=monto_raw)
+
+                        # Al agregar exitosamente, limpiamos monto/ref pero mantenemos modo/banco.
+                        inv["pago_form"] = {
+                            "modo": modo,
+                            "banco": (pago_banco or "").strip() if requiere_banco else "",
+                            "ref": "",
+                            "monto": "",
+                        }
         elif action == "eliminar_pago":
             remove_pago(inv, remove_pago_idx)
         elif action == "limpiar":
             inv = clear_invoice(inv)
             inv["tipdoc"] = tipdoc
+            inv["pago_form"] = {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""}
         else:
             # action vacío o no soportado: no hacer nada
             pass
@@ -873,6 +901,57 @@ def facturacion_factura_nueva_post(
             "hide_topbar": True,
         },
     )
+
+
+@router.get("/facturacion/factura/confirmar")
+def facturacion_factura_confirmar(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    inv = request.session.get("factura")
+    if not isinstance(inv, dict):
+        request.session["flash"] = "No hay un documento en sesión."
+        return RedirectResponse(url="/facturacion/facturas?tipdoc=FAV", status_code=303)
+
+    inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
+    recalc(inv)
+    request.session["factura"] = inv
+
+    tipdoc = (inv.get("tipdoc") or "FAV").strip().upper() or "FAV"
+
+    if not (inv.get("items") or []):
+        request.session["flash"] = "El documento Debe Tener algun Articulo!!"
+        return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
+
+    vend_codigo = str((inv.get("vendedor") or {}).get("codigo") or "").strip()
+    if not vend_codigo:
+        request.session["flash"] = "Debe Seleccionar un vendedor Activo!!"
+        return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
+
+    cli_codigo = str((inv.get("cliente") or {}).get("codigo") or "").strip()
+    if not cli_codigo:
+        request.session["flash"] = "Debe Seleccionar un cliente."
+        return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
+
+    from app.modules.facturacion.factura_session import _d
+
+    neto = _d((inv.get("totales") or {}).get("neto"))
+    pagado = _d((inv.get("totales") or {}).get("pagado"))
+
+    requiere_supervisor = pagado < neto
+    if requiere_supervisor and not request.session.get("factura_supervisor_ok"):
+        next_url = "/facturacion/factura/confirmar"
+        return RedirectResponse(url=f"/facturacion/clave-confirmacion?scope=factura&next={next_url}", status_code=303)
+
+    if requiere_supervisor:
+        request.session.pop("factura_supervisor_ok", None)
+        request.session.pop("factura_supervisor_user", None)
+
+    # Stub de guardado/impresión: dejamos el hook y limpiamos la sesión como en WinForms al finalizar.
+    request.session["flash"] = "Documento confirmado (stub). Próximo paso: guardar + imprimir."
+    request.session["factura"] = clear_invoice(inv)
+    return RedirectResponse(url=f"/facturacion/facturas?tipdoc={tipdoc}", status_code=303)
 
 
 @router.get("/facturacion/devolucion/nueva", response_class=HTMLResponse)

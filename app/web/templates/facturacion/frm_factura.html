@@ -57,7 +57,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 </style>
 {% endblock %} {% block content %} {% set tipdoc = inv["tipdoc"] if inv else
 'FAV' %} {% set titulo_doc = 'Factura de Venta' if tipdoc=='FAV' else
-('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %}
+('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %} {% set pago_form = (inv.get('pago_form') if inv else {}) or {} %}
 
 <div class="grid">
   <div class="col-12">
@@ -357,14 +357,14 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                   <div class="col-12">
                     <label class="muted">Modo Pago</label>
                     <select class="input" name="pago_modo">
-                      <option value="Efectivo">Efectivo</option>
-                      <option value="Tarjeta de Debito">
+                      <option value="Efectivo" {% if pago_form.get('modo','Efectivo') == 'Efectivo' %}selected{% endif %}>Efectivo</option>
+                      <option value="Tarjeta de Debito" {% if pago_form.get('modo') == 'Tarjeta de Debito' %}selected{% endif %}>
                         Tarjeta de Debito
                       </option>
-                      <option value="Tarjeta de Credito">
+                      <option value="Tarjeta de Credito" {% if pago_form.get('modo') == 'Tarjeta de Credito' %}selected{% endif %}>
                         Tarjeta de Credito
                       </option>
-                      <option value="Cheque">Cheque</option>
+                      <option value="Cheque" {% if pago_form.get('modo') == 'Cheque' %}selected{% endif %}>Cheque</option>
                     </select>
                   </div>
 
@@ -375,6 +375,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                         id="pago_banco"
                         class="input"
                         name="pago_banco"
+                        value="{{ pago_form.get('banco','') }}"
                         placeholder="Código"
                         autocomplete="off"
                       />
@@ -390,12 +391,12 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                   </div>
                   <div class="col-6">
                     <label class="muted">N° / Ref</label>
-                    <input class="input" name="pago_ref" placeholder="Número" />
+                    <input class="input" name="pago_ref" value="{{ pago_form.get('ref','') }}" placeholder="Número" />
                   </div>
 
                   <div class="col-6">
                     <label class="muted">Monto Abonar</label>
-                    <input class="input" name="pago_monto" placeholder="0.00" />
+                    <input class="input" name="pago_monto" value="{{ pago_form.get('monto','') }}" placeholder="0.00" />
                   </div>
                   <div
                     class="col-6"
@@ -523,7 +524,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                   <div class="toolbar__left">
                     <a
                       class="btn btn--ghost"
-                      href="/facturacion/clave-confirmacion"
+                      href="/facturacion/factura/confirmar"
                       >Confirmar Documento</a
                     >
                     <a
