@@ -790,6 +790,14 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     if (lookupType === "clientes") {
       const input = document.getElementById("cli_codigo");
       input.value = String(item.cli_codigo || "").trim();
+
+      const cliNombre = document.getElementById("cli_nombre");
+      const cliRif = document.getElementById("cli_rif");
+      const cliDirecc = document.getElementById("cli_direccion");
+      if (cliNombre) cliNombre.value = String(item.cli_nombre || "");
+      if (cliRif) cliRif.value = String(item.cli_rif || "");
+      if (cliDirecc) cliDirecc.value = "";
+
       closeLookup();
       submitAction(document.getElementById("formDatos"), "buscar_cliente");
       return;

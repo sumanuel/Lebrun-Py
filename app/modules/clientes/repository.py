@@ -14,7 +14,7 @@ class ClientesRepository:
         if not codigo:
             return None
 
-        sql = text(
+        sql_with_addr = text(
             """
             SELECT
               cli_codigo,
@@ -27,10 +27,30 @@ class ClientesRepository:
             """
         )
 
+        sql_no_addr = text(
+            """
+            SELECT
+              cli_codigo,
+              cli_rif,
+              cli_nombre
+            FROM admclientes
+            WHERE cli_codigo = :codigo
+            LIMIT 1
+            """
+        )
+
         try:
             with session_for(settings.db_sysadm) as s:
-                row = s.execute(sql, {"codigo": codigo}).mappings().first()
-                return dict(row) if row else None
+                try:
+                    row = s.execute(sql_with_addr, {"codigo": codigo}).mappings().first()
+                    return dict(row) if row else None
+                except SQLAlchemyError as e:
+                    # Algunas instalaciones no tienen cli_direcc (o difiere el nombre).
+                    msg = str(e).lower()
+                    if "unknown column" in msg and "cli_direcc" in msg:
+                        row = s.execute(sql_no_addr, {"codigo": codigo}).mappings().first()
+                        return dict(row) if row else None
+                    raise
         except SQLAlchemyError as e:
             raise DatabaseUnavailable("Error al cargar cliente (sisadm).") from e
 
