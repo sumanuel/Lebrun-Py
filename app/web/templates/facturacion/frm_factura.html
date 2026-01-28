@@ -265,12 +265,13 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     >
                       Agregar
                     </button>
-                    <a
+                    <button
                       class="btn btn--ghost"
-                      href="/ventas/visor-precios"
-                      target="_blank"
-                      >Visor</a
+                      type="button"
+                      onclick="openVisorPrecios()"
                     >
+                      Visor
+                    </button>
                   </div>
                 </form>
 
@@ -653,6 +654,10 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     const byWrap = document.getElementById("lookupByWrap");
     byWrap.style.display = type === "productos" ? "block" : "none";
 
+    if (type === "productos") {
+      document.getElementById("lookupBy").value = "descripcion";
+    }
+
     const titleMap = {
       clientes: "Buscar Clientes",
       vendedores: "Buscar Vendedores",
@@ -665,6 +670,11 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     renderLookupHeader();
     runLookup();
     setTimeout(() => document.getElementById("lookupQuery").focus(), 0);
+  }
+
+  function openVisorPrecios() {
+    openLookup("productos");
+    document.getElementById("lookupTitle").innerText = "Visor de Precios";
   }
 
   function closeLookup() {
@@ -680,7 +690,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     const colsByType = {
       clientes: ["Código", "Nombre", "RIF"],
       vendedores: ["Código", "Nombre"],
-      productos: ["Código", "Descripción", "Unidad", "Precio"],
+      productos: ["Código", "Descripción", "Unidad", "Precio", "Existencia"],
       bancos: ["Código", "Nombre"],
     };
     const cols = colsByType[lookupType] || ["Resultado"];
@@ -709,15 +719,21 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     if (!url) return;
 
     const body = document.getElementById("lookupBody");
-    body.innerHTML = `<tr><td class="muted" colspan="6">Buscando...</td></tr>`;
+    body.innerHTML = `<tr><td class="muted" colspan="8">Buscando...</td></tr>`;
 
     try {
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       const data = await res.json();
+      if (data && data.error) {
+        body.innerHTML = `<tr><td class="muted" colspan="8">${String(
+          data.error
+        )}</td></tr>`;
+        return;
+      }
       const items = (data && data.items) || [];
       renderLookupRows(items);
     } catch (e) {
-      body.innerHTML = `<tr><td class="muted" colspan="6">Error: ${String(
+      body.innerHTML = `<tr><td class="muted" colspan="8">Error: ${String(
         e
       )}</td></tr>`;
     }
@@ -727,7 +743,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     const body = document.getElementById("lookupBody");
     body.innerHTML = "";
     if (!items || !items.length) {
-      body.innerHTML = `<tr><td class="muted" colspan="6">Sin resultados.</td></tr>`;
+      body.innerHTML = `<tr><td class="muted" colspan="8">Sin resultados.</td></tr>`;
       return;
     }
 
@@ -748,6 +764,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
         tr.appendChild(td(item.Descripcion));
         tr.appendChild(td(item.Unidad));
         tr.appendChild(td(item.Precio));
+        tr.appendChild(td(item.Existencia));
       } else if (lookupType === "bancos") {
         tr.appendChild(td(item.ban_codigo));
         tr.appendChild(td(item.ban_nombre));

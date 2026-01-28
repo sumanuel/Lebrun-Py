@@ -699,6 +699,7 @@ def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
             "page_title": "Factura",
             "message": None,
             "inv": inv,
+            "hide_topbar": True,
         },
     )
 
@@ -854,6 +855,7 @@ def facturacion_factura_nueva_post(
             "page_title": "Factura",
             "message": message,
             "inv": inv,
+            "hide_topbar": True,
         },
     )
 

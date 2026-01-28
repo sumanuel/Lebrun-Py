@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -72,7 +72,7 @@
       {% endif %}
 
       <main class="main">
-        {% if not hide_nav %}
+        {% if not hide_nav and not hide_topbar %}
         <header class="topbar">
           <div class="topbar__left">
             <div class="page-title">{% block page_title %}{% endblock %}</div>
