@@ -138,8 +138,28 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     <input class="input" value="(pendiente)" readonly />
                   </div>
 
+                  <div class="col-12">
+                    <label class="muted">Nombre</label>
+                    <input
+                      id="cli_nombre"
+                      class="input"
+                      value="{{ inv["cliente"]["nombre"] }}"
+                      readonly
+                    />
+                  </div>
+
+                  <div class="col-12">
+                    <label class="muted">Dirección</label>
+                    <input
+                      id="cli_direccion"
+                      class="input"
+                      value="{{ inv["cliente"]["direccion"] }}"
+                      readonly
+                    />
+                  </div>
+
                   <div class="col-4">
-                    <label class="muted">Vend</label>
+                    <label class="muted">cod Vendedor</label>
                     <input
                       id="vend_codigo"
                       class="input"
@@ -160,8 +180,8 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                       🔎
                     </button>
                   </div>
-                  <div class="col-7">
-                    <label class="muted">Vendedor</label>
+                  <div class="col-4">
+                    <label class="muted">Nombre Vendedor</label>
                     <input
                       id="vend_nombre"
                       class="input"
@@ -171,25 +191,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     />
                   </div>
 
-                  <div class="col-12">
-                    <label class="muted">Nombre</label>
-                    <input
-                      id="cli_nombre"
-                      class="input"
-                      value="{{ inv["cliente"]["nombre"] }}"
-                      readonly
-                    />
-                  </div>
-
-                  <div class="col-12">
-                    <label class="muted">Dirección</label>
-                    <input
-                      id="cli_direccion"
-                      class="input"
-                      value="{{ inv["cliente"]["direccion"] }}"
-                      readonly
-                    />
-                  </div>
+                  
                 </form>
               </div>
             </div>
