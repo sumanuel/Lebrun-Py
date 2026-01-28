@@ -13,18 +13,6 @@ page_title %}{{ titulo }}{% endblock %} {% block sidebar %}{% include
 
         <div class="toolbar">
           <div class="toolbar__left">
-            <div class="toolbar__left" style="gap: 8px">
-              <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=FAV"
-                >Facturas Venta</a
-              >
-              <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=DEV"
-                >Devoluciones</a
-              >
-              <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc=NDE"
-                >Notas Débito</a
-              >
-            </div>
-
             <form
               method="get"
               action="/facturacion/facturas"

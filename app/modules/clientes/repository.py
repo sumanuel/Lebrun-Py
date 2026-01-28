@@ -38,30 +38,58 @@ class ClientesRepository:
         q = (q or "").strip()
         limit = max(1, min(int(limit or 50), 200))
         if not q:
-            sql = text(
-                """
-                SELECT cli_codigo, cli_rif, cli_nombre, cli_direcc
-                FROM admclientes
-                ORDER BY cli_codigo
-                LIMIT :limit
+            # Para el modal: si hay muchas filas en admclientes, un listado "general" puede
+            # ser costoso. Traemos clientes recientes basados en documentos.
+            sql_recent = text(
+                f"""
+                                SELECT c.cli_codigo, c.cli_rif, c.cli_nombre
+                FROM admclientes c
+                JOIN (
+                  SELECT dcli_codigo, MAX(dcli_fecha) AS max_fecha
+                  FROM admdoccli2
+                  GROUP BY dcli_codigo
+                  ORDER BY max_fecha DESC
+                  LIMIT {limit}
+                ) r ON r.dcli_codigo = c.cli_codigo
+                ORDER BY r.max_fecha DESC
                 """
             )
-            params = {"limit": limit}
+
+            sql_fallback = text(
+                f"""
+                SELECT cli_codigo, cli_rif, cli_nombre
+                FROM admclientes
+                LIMIT {limit}
+                """
+            )
+
+            try:
+                with session_for(settings.db_sysadm) as s:
+                    rows = s.execute(sql_recent, {}).mappings().all()
+                    return [dict(r) for r in rows]
+            except SQLAlchemyError:
+                # Fallback simple (si admdoccli2 no existe o falla la query)
+                try:
+                    with session_for(settings.db_sysadm) as s:
+                        rows = s.execute(sql_fallback, {}).mappings().all()
+                        return [dict(r) for r in rows]
+                except SQLAlchemyError as e:
+                    raise DatabaseUnavailable(f"Error al buscar clientes (sisadm): {e}") from e
         else:
             sql = text(
-                """
-                SELECT cli_codigo, cli_rif, cli_nombre, cli_direcc
+                f"""
+                SELECT cli_codigo, cli_rif, cli_nombre
                 FROM admclientes
                 WHERE cli_codigo LIKE :term OR cli_nombre LIKE :term
                 ORDER BY cli_codigo
-                LIMIT :limit
+                LIMIT {limit}
                 """
             )
-            params = {"term": f"%{q}%", "limit": limit}
+            params = {"term": f"%{q}%"}
 
         try:
             with session_for(settings.db_sysadm) as s:
                 rows = s.execute(sql, params).mappings().all()
                 return [dict(r) for r in rows]
         except SQLAlchemyError as e:
-            raise DatabaseUnavailable("Error al buscar clientes (sisadm).") from e
+            raise DatabaseUnavailable(f"Error al buscar clientes (sisadm): {e}") from e

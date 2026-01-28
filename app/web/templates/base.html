@@ -8,6 +8,7 @@
     {% block extra_head %}{% endblock %}
   </head>
   <body>
+    {% set hide_topbar = hide_topbar if hide_topbar is defined else True %}
     <div class="app-shell {% if hide_nav %}app-shell--no-nav{% endif %}">
       {% if not hide_nav %}
       <aside class="sidebar" id="sidebar">
@@ -66,6 +67,14 @@
               >
             </div>
             {% endif %}
+          </div>
+
+          <div style="margin-top: 10px">
+            <form method="post" action="/logout">
+              <button class="btn btn--ghost" type="submit" style="width: 100%">
+                Salir
+              </button>
+            </form>
           </div>
         </div>
       </aside>
