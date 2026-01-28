@@ -24,7 +24,7 @@ page_title %}{{ titulo }}{% endblock %} {% block sidebar %}{% include
                 class="input"
                 type="date"
                 name="date_from"
-                value="{{ date_from or '' }}"
+                value="{{ date_from or today or '' }}"
                 title="Desde"
               />
 
@@ -32,7 +32,7 @@ page_title %}{{ titulo }}{% endblock %} {% block sidebar %}{% include
                 class="input"
                 type="date"
                 name="date_to"
-                value="{{ date_to or '' }}"
+                value="{{ date_to or today or '' }}"
                 title="Hasta"
               />
 

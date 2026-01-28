@@ -18,6 +18,8 @@ class ProductoRow:
     precio: float | None
     existencia: float | None
     exento: str | None
+    iva_tipo: str | None
+    iva_pct: float | None
 
 
 class VentasRepository:
@@ -34,10 +36,13 @@ class VentasRepository:
               adminvmed.ime_undmed AS Unidad,
               admprecios.pre_precio AS Precio,
               existencia AS Existencia,
-              inv_ex AS Exento
+                            inv_ex AS Exento,
+                            adminv.inv_iva AS IvaTipo,
+                            admiva.alict_venta AS IvaPct
             FROM adminv
             LEFT OUTER JOIN adminv2 ON adminv.inv_codigo = adminv2.inv2_codigo
             LEFT JOIN adminvmed ON adminvmed.ime_codigo = adminv.inv_codigo
+                        LEFT JOIN admiva ON adminv.inv_iva = admiva.alict_tipodiva
             LEFT JOIN admprecios
               ON admprecios.pre_codigo = adminv.inv_codigo
              AND admprecios.pre_lista = 'A'
@@ -76,12 +81,15 @@ class VentasRepository:
               admprecios.pre_precio AS Precio,
               existencia AS Existencia,
               inv_ex AS Exento,
+                            adminv.inv_iva AS IvaTipo,
+                            admiva.alict_venta AS IvaPct,
               precio_pmvp AS PMVP,
               inv_proced AS Procedencia,
               ult_provee AS pro_principal
             FROM adminv
             LEFT OUTER JOIN adminv2 ON adminv.inv_codigo = adminv2.inv2_codigo
             LEFT JOIN adminvmed ON adminvmed.ime_codigo = adminv.inv_codigo
+                        LEFT JOIN admiva ON adminv.inv_iva = admiva.alict_tipodiva
             LEFT JOIN admprecios
               ON admprecios.pre_codigo = adminv.inv_codigo
              AND admprecios.pre_lista = 'A'

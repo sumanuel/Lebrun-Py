@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.responses import JSONResponse
@@ -187,6 +189,7 @@ def facturacion_facturas(
             "q": q,
             "date_from": date_from,
             "date_to": date_to,
+            "today": date.today().isoformat(),
         },
     )
 
@@ -807,6 +810,9 @@ def facturacion_factura_nueva_post(
                             "codigo": prod.get("Codigo"),
                             "descripcion": prod.get("Descripcion"),
                             "unidad": prod.get("Unidad"),
+                            "exento": prod.get("Exento"),
+                            "iva_tipo": prod.get("IvaTipo"),
+                            "iva_pct": prod.get("IvaPct"),
                         },
                         cantidad=prod_cantidad,
                         precio=precio,
@@ -816,18 +822,27 @@ def facturacion_factura_nueva_post(
         elif action == "eliminar_item":
             remove_item(inv, remove_item_idx)
         elif action == "agregar_pago":
-            modo = (pago_modo or "").strip()
-            if not (pago_monto or "").strip():
-                message = "Indique monto a abonar."
+            modo = (pago_modo or "").strip() or "Efectivo"
+            monto_raw = (pago_monto or "").strip()
+
+            if not monto_raw:
+                message = "El Monto Abonar no puede quedar Vacio!!"
             else:
-                # Reglas simples (WinForms exige banco+numero si no es efectivo)
-                if modo.lower() != "efectivo":
-                    if not (pago_banco or "").strip() or not (pago_ref or "").strip():
-                        message = "Para este modo de pago debe indicar banco y número/referencia."
-                    else:
-                        add_pago(inv, modo=modo, banco=pago_banco, referencia=pago_ref, monto=pago_monto)
+                from app.modules.facturacion.factura_session import _d
+
+                monto = _d(monto_raw)
+                if monto <= 0:
+                    message = "El monto debe ser mayor que 0"
                 else:
-                    add_pago(inv, modo=modo, banco="N/A", referencia="N/A", monto=pago_monto)
+                    requiere_banco = modo in {"Tarjeta de Debito", "Tarjeta de Credito", "Cheque"}
+                    if requiere_banco and not (pago_banco or "").strip():
+                        message = f"Para el Modo de pago {modo} el campo Banco no puede quedar Vacio!!"
+                    elif requiere_banco and not (pago_ref or "").strip():
+                        message = f"El Nº para el  Modo de pago {modo} no puede quedar Vacio!!"
+                    else:
+                        banco = (pago_banco or "").strip() if requiere_banco else "N/A"
+                        referencia = (pago_ref or "").strip() if requiere_banco else "N/A"
+                        add_pago(inv, modo=modo, banco=banco, referencia=referencia, monto=monto_raw)
         elif action == "eliminar_pago":
             remove_pago(inv, remove_pago_idx)
         elif action == "limpiar":

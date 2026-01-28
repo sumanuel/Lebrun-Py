@@ -1,75 +1,150 @@
-{% extends "base.html" %}
-
-{% block page_title %}Visor de Precios{% endblock %}
-{% block sidebar %}{% include "_sidebar.html" %}{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block page_title %}Visor de Precios{% endblock %}
+{% block sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block
+extra_head %}
+<style>
+  .visor-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: calc(100vh - 180px);
+  }
+  .visor-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .visor-table {
+    overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+  }
+  .visor-table .table {
+    margin: 0;
+  }
+  .visor-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #0b1220;
+  }
+</style>
+{% endblock %} {% block content %}
 <div class="grid">
   <div class="col-12">
     <div class="card">
       <div class="card__title">Visor de Precios</div>
       <div class="card__body">
         {% if error %}
-          <div class="alert">{{ error }}</div>
+        <div class="alert">{{ error }}</div>
         {% endif %}
 
-        <div class="toolbar">
-          <div class="toolbar__left">
-            <form method="get" action="/ventas/visor-precios" class="toolbar__left">
-              <select name="by" class="input" style="min-width: 140px">
-                <option value="descripcion" {% if by=='descripcion' %}selected{% endif %}>Descripción</option>
-                <option value="codigo" {% if by=='codigo' %}selected{% endif %}>Código</option>
-                <option value="grupo" {% if by=='grupo' %}selected{% endif %}>Grupo</option>
-              </select>
+        <div class="visor-shell">
+          <div class="visor-toolbar">
+            <div class="toolbar" style="margin: 0">
+              <div class="toolbar__left">
+                <form
+                  method="get"
+                  action="/ventas/visor-precios"
+                  class="toolbar__left"
+                >
+                  <select name="by" class="input" style="min-width: 140px">
+                    <option
+                      value="descripcion"
+                      {%
+                      if
+                      by=""
+                      ="descripcion"
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      Descripción
+                    </option>
+                    <option
+                      value="codigo"
+                      {%
+                      if
+                      by=""
+                      ="codigo"
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      Código
+                    </option>
+                    <option
+                      value="grupo"
+                      {%
+                      if
+                      by=""
+                      ="grupo"
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      Grupo
+                    </option>
+                  </select>
 
-              <input
-                class="input"
-                type="search"
-                name="q"
-                placeholder="Buscar…"
-                value="{{ q or '' }}"
-                style="min-width: 320px"
-                autofocus
-              />
+                  <input
+                    class="input"
+                    type="search"
+                    name="q"
+                    placeholder="Buscar…"
+                    value="{{ q or '' }}"
+                    style="min-width: 320px"
+                    autofocus
+                  />
 
-              <button class="btn" type="submit">Buscar</button>
-              <a class="btn btn--ghost" href="/ventas/visor-precios">Limpiar</a>
-            </form>
+                  <button class="btn" type="submit">Buscar</button>
+                  <a class="btn btn--ghost" href="/ventas/visor-precios"
+                    >Limpiar</a
+                  >
+                </form>
+              </div>
+
+              <div class="toolbar__right">
+                <span class="badge">Mostrados: {{ rows|length }}</span>
+              </div>
+            </div>
           </div>
 
-          <div class="toolbar__right">
-            <span class="badge">Mostrados: {{ rows|length }}</span>
+          <div class="visor-table">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th>Unidad</th>
+                  <th style="text-align: right">Precio</th>
+                  <th style="text-align: right">Existencia</th>
+                  <th>Exento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in rows %}
+                <tr>
+                  <td>{{ r.Codigo }}</td>
+                  <td>{{ r.Descripcion }}</td>
+                  <td>{{ r.Unidad }}</td>
+                  <td style="text-align: right">{{ r.Precio }}</td>
+                  <td style="text-align: right">{{ r.Existencia }}</td>
+                  <td>{{ r.Exento }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="muted">Sin resultados.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Descripción</th>
-              <th>Unidad</th>
-              <th style="text-align:right">Precio</th>
-              <th style="text-align:right">Existencia</th>
-              <th>Exento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in rows %}
-              <tr>
-                <td>{{ r.Codigo }}</td>
-                <td>{{ r.Descripcion }}</td>
-                <td>{{ r.Unidad }}</td>
-                <td style="text-align:right">{{ r.Precio }}</td>
-                <td style="text-align:right">{{ r.Existencia }}</td>
-                <td>{{ r.Exento }}</td>
-              </tr>
-            {% else %}
-              <tr>
-                <td colspan="6" class="muted">Sin resultados.</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
 
         <div class="actions" style="margin-top: 12px">
           <a class="btn btn--ghost" href="/">Inicio</a>

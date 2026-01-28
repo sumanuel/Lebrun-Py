@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 
 
 def _d(v: object, default: Decimal = Decimal("0")) -> Decimal:
@@ -26,6 +26,16 @@ def _clamp_int(v: object, default: int = 1, min_v: int = 0, max_v: int = 10_000)
     except Exception:
         return default
     return max(min_v, min(max_v, n))
+
+
+def _trunc(v: Decimal, places: int = 6) -> Decimal:
+    q = Decimal("1") if places <= 0 else Decimal("1").scaleb(-places)
+    return v.quantize(q, rounding=ROUND_DOWN)
+
+
+def _is_exento(v: object) -> bool:
+    s = str(v or "").strip().lower()
+    return s in {"1", "si", "sí", "s", "true", "t", "y", "yes"}
 
 
 def invoice_default(tipdoc: str = "FAV") -> dict:
@@ -62,6 +72,7 @@ def recalc(invoice: dict) -> None:
     subtotal = Decimal("0")
     total_prod = Decimal("0")
     des_items = Decimal("0")
+    iva = Decimal("0")
 
     for it in items:
         qty = _d(it.get("cantidad"), Decimal("0"))
@@ -71,13 +82,18 @@ def recalc(invoice: dict) -> None:
         disc = (line * (desc_pct / Decimal("100"))) if desc_pct > 0 else Decimal("0")
         total = line - disc
 
+        exento = _is_exento(it.get("exento"))
+        iva_pct = _d(it.get("iva_pct"), Decimal("0"))
+        line_iva = Decimal("0") if (exento or iva_pct <= 0) else _trunc((total * iva_pct) / Decimal("100"), 6)
+        it["iva"] = f"{line_iva:.6f}"
+
         it["total"] = f"{total:.2f}"
         subtotal += line
         des_items += disc
         total_prod += qty
+        iva += line_iva
 
     base = subtotal - des_items
-    iva = Decimal("0")
     neto = base + iva
 
     pagado = Decimal("0")
@@ -127,10 +143,14 @@ def add_item(invoice: dict, *, producto: dict, cantidad: object, precio: object,
             "codigo": str(producto.get("codigo") or ""),
             "nombre": str(producto.get("descripcion") or producto.get("nombre") or ""),
             "unidad": str(producto.get("unidad") or ""),
+            "exento": str(producto.get("exento") or ""),
+            "iva_tipo": str(producto.get("iva_tipo") or ""),
+            "iva_pct": f"{_d(producto.get('iva_pct'), Decimal('0')):.2f}",
             "cantidad": f"{qty:.2f}",
             "precio": f"{pr:.2f}",
             "desc": f"{_d(desc_pct, Decimal('0')):.2f}",
             "total": "0.00",
+            "iva": "0.000000",
         }
     )
     recalc(invoice)
