@@ -105,36 +105,33 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 
                   <div class="col-4">
                     <label class="muted">Cliente</label>
-                    <input id="cli_codigo" class="input" name="cli_codigo"
-                    value="{{ inv["cliente"]["codigo"] }}" placeholder="Código"
-                    autocomplete="off" />
+                    <input
+                      id="cli_codigo"
+                      class="input"
+                      name="cli_codigo"
+                      value="{{ inv["cliente"]["codigo"] }}"
+                      placeholder="Código"
+                      autocomplete="off"
+                    />
                   </div>
-                  <div
-                    class="col-2"
-                    style="display: flex; align-items: end; gap: 8px"
-                  >
-                    <button
-                      class="btn btn--ghost"
-                      type="submit"
-                      name="action"
-                      value="buscar_cliente"
-                      title="Buscar cliente"
-                    >
-                      🔎
-                    </button>
+                  <div class="col-1" style="display: flex; align-items: end">
                     <button
                       class="btn btn--ghost"
                       type="button"
+                      title="Buscar"
                       onclick="openLookup('clientes')"
-                      title="Buscar en lista"
                     >
-                      Lista
+                      🔎
                     </button>
                   </div>
-                  <div class="col-2">
+                  <div class="col-3">
                     <label class="muted">RIF</label>
-                    <input class="input" value="{{ inv["cliente"]["rif"] }}"
-                    readonly />
+                    <input
+                      id="cli_rif"
+                      class="input"
+                      value="{{ inv["cliente"]["rif"] }}"
+                      readonly
+                    />
                   </div>
                   <div class="col-4">
                     <label class="muted">Núm Fac</label>
@@ -143,49 +140,55 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 
                   <div class="col-4">
                     <label class="muted">Vend</label>
-                    <input id="vend_codigo" class="input" name="vend_codigo"
-                    value="{{ inv["vendedor"]["codigo"] }}" placeholder="Código"
-                    maxlength="10" autocomplete="off" />
+                    <input
+                      id="vend_codigo"
+                      class="input"
+                      name="vend_codigo"
+                      value="{{ inv["vendedor"]["codigo"] }}"
+                      placeholder="Código"
+                      maxlength="10"
+                      autocomplete="off"
+                    />
                   </div>
-                  <div
-                    class="col-2"
-                    style="display: flex; align-items: end; gap: 8px"
-                  >
-                    <button
-                      class="btn btn--ghost"
-                      type="submit"
-                      name="action"
-                      value="buscar_vendedor"
-                      title="Buscar vendedor"
-                    >
-                      🔎
-                    </button>
+                  <div class="col-1" style="display: flex; align-items: end">
                     <button
                       class="btn btn--ghost"
                       type="button"
+                      title="Buscar"
                       onclick="openLookup('vendedores')"
-                      title="Buscar en lista"
                     >
-                      Lista
+                      🔎
                     </button>
                   </div>
-                  <div class="col-6">
+                  <div class="col-7">
                     <label class="muted">Vendedor</label>
-                    <input id="vend_nombre" class="input" value="{{
-                    inv["vendedor"]["nombre"] }}" placeholder="(resuelve al
-                    buscar)" readonly />
+                    <input
+                      id="vend_nombre"
+                      class="input"
+                      value="{{ inv["vendedor"]["nombre"] }}"
+                      placeholder="(resuelve al buscar)"
+                      readonly
+                    />
                   </div>
 
                   <div class="col-12">
-                    <label class="muted">Cliente</label>
-                    <input class="input" value="{{ inv["cliente"]["nombre"] }}"
-                    readonly />
+                    <label class="muted">Nombre</label>
+                    <input
+                      id="cli_nombre"
+                      class="input"
+                      value="{{ inv["cliente"]["nombre"] }}"
+                      readonly
+                    />
                   </div>
 
                   <div class="col-12">
                     <label class="muted">Dirección</label>
-                    <input class="input" value="{{ inv["cliente"]["direccion"]
-                    }}" readonly />
+                    <input
+                      id="cli_direccion"
+                      class="input"
+                      value="{{ inv["cliente"]["direccion"] }}"
+                      readonly
+                    />
                   </div>
                 </form>
               </div>
@@ -212,28 +215,19 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     maxlength="15" autocomplete="off" />
                   </div>
                   <div
-                    class="col-2"
+                    class="col-1"
                     style="display: flex; align-items: end; gap: 8px"
                   >
-                    <button
-                      class="btn btn--ghost"
-                      type="submit"
-                      name="action"
-                      value="buscar_producto"
-                      title="Buscar producto"
-                    >
-                      🔎
-                    </button>
                     <button
                       class="btn btn--ghost"
                       type="button"
                       onclick="openLookup('productos')"
                       title="Buscar en lista"
                     >
-                      Lista
+                      🔎
                     </button>
                   </div>
-                  <div class="col-4">
+                  <div class="col-5">
                     <label class="muted">Nombre</label>
                     <input id="prod_nombre" class="input" value="{{
                     inv["producto"]["nombre"] }}" placeholder="(auto al
@@ -387,7 +381,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                         onclick="openLookup('bancos')"
                         title="Buscar banco"
                       >
-                        Lista
+                        🔎
                       </button>
                     </div>
                   </div>
@@ -807,6 +801,29 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    const cli = document.getElementById("cli_codigo");
+    const cliNombre = document.getElementById("cli_nombre");
+    const cliRif = document.getElementById("cli_rif");
+    const cliDirecc = document.getElementById("cli_direccion");
+
+    cli.addEventListener("input", () => {
+      if (cliNombre) cliNombre.value = "";
+      if (cliRif) cliRif.value = "";
+      if (cliDirecc) cliDirecc.value = "";
+    });
+
+    cli.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitAction(document.getElementById("formDatos"), "buscar_cliente");
+      }
+    });
+    cli.addEventListener("blur", () => {
+      const code = String(cli.value || "").trim();
+      const name = String((cliNombre && cliNombre.value) || "").trim();
+      if (code && !name) submitAction(document.getElementById("formDatos"), "buscar_cliente");
+    });
+
     const lookupQuery = document.getElementById("lookupQuery");
     lookupQuery.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {

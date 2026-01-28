@@ -38,20 +38,30 @@ class ClientesRepository:
         q = (q or "").strip()
         limit = max(1, min(int(limit or 50), 200))
         if not q:
-            return []
-
-        sql = text(
-            """
-            SELECT cli_codigo, cli_rif, cli_nombre, cli_direcc
-            FROM admclientes
-            WHERE cli_codigo LIKE :term OR cli_nombre LIKE :term
-            LIMIT :limit
-            """
-        )
+            sql = text(
+                """
+                SELECT cli_codigo, cli_rif, cli_nombre, cli_direcc
+                FROM admclientes
+                ORDER BY cli_codigo
+                LIMIT :limit
+                """
+            )
+            params = {"limit": limit}
+        else:
+            sql = text(
+                """
+                SELECT cli_codigo, cli_rif, cli_nombre, cli_direcc
+                FROM admclientes
+                WHERE cli_codigo LIKE :term OR cli_nombre LIKE :term
+                ORDER BY cli_codigo
+                LIMIT :limit
+                """
+            )
+            params = {"term": f"%{q}%", "limit": limit}
 
         try:
             with session_for(settings.db_sysadm) as s:
-                rows = s.execute(sql, {"term": f"%{q}%", "limit": limit}).mappings().all()
+                rows = s.execute(sql, params).mappings().all()
                 return [dict(r) for r in rows]
         except SQLAlchemyError as e:
             raise DatabaseUnavailable("Error al buscar clientes (sisadm).") from e

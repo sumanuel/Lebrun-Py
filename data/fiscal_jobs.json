@@ -76,5 +76,44 @@
     },
     "result": null,
     "error": null
+  },
+  {
+    "id": "184a345aa33242e191eb591778c0f3ac",
+    "created_at": "2026-01-28T16:46:13Z",
+    "status": "pending",
+    "caja": "0001",
+    "job_type": "REPORT_ZX",
+    "payload": {
+      "report": "X",
+      "requested_by": "caja1"
+    },
+    "result": null,
+    "error": null
+  },
+  {
+    "id": "2b68103664cd4609934a50b72916b58d",
+    "created_at": "2026-01-28T17:38:12Z",
+    "status": "pending",
+    "caja": "0001",
+    "job_type": "REPORT_ZX",
+    "payload": {
+      "report": "X",
+      "requested_by": "caja1"
+    },
+    "result": null,
+    "error": null
+  },
+  {
+    "id": "fe4fcd860eb9400587e9a8c0248d7648",
+    "created_at": "2026-01-28T17:38:17Z",
+    "status": "pending",
+    "caja": "0001",
+    "job_type": "REPORT_ZX",
+    "payload": {
+      "report": "Z",
+      "requested_by": "caja1"
+    },
+    "result": null,
+    "error": null
   }
 ]

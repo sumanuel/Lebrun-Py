@@ -624,8 +624,6 @@ def api_lookup_clientes(request: Request, q: str = Query("")):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     q = (q or "").strip()
-    if not q:
-        return {"items": []}
 
     try:
         repo = ClientesRepository()
