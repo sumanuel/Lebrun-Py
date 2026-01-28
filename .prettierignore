@@ -1,0 +1,2 @@
+# Evita que Prettier rompa Jinja en este template
+app/web/templates/ventas/visor_precios.html

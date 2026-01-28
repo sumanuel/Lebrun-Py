@@ -53,40 +53,13 @@ extra_head %}
                   class="toolbar__left"
                 >
                   <select name="by" class="input" style="min-width: 140px">
-                    <option
-                      value="descripcion"
-                      {%
-                      if
-                      by=""
-                      ="descripcion"
-                      %}selected{%
-                      endif
-                      %}
-                    >
+                    <option value="descripcion">
                       Descripción
                     </option>
-                    <option
-                      value="codigo"
-                      {%
-                      if
-                      by=""
-                      ="codigo"
-                      %}selected{%
-                      endif
-                      %}
-                    >
+                    <option value="codigo">
                       Código
                     </option>
-                    <option
-                      value="grupo"
-                      {%
-                      if
-                      by=""
-                      ="grupo"
-                      %}selected{%
-                      endif
-                      %}
-                    >
+                    <option value="grupo">
                       Grupo
                     </option>
                   </select>
@@ -149,6 +122,15 @@ extra_head %}
         <div class="actions" style="margin-top: 12px">
           <a class="btn btn--ghost" href="/">Inicio</a>
         </div>
+
+        <script>
+          // Evita que el formateador rompa Jinja en atributos "selected".
+          (function () {
+            const sel = document.querySelector('select[name="by"]');
+            if (!sel) return;
+            sel.value = "{{ (by or 'descripcion')|e }}";
+          })();
+        </script>
       </div>
     </div>
   </div>
