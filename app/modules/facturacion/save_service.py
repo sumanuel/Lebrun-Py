@@ -89,6 +89,16 @@ def _update_correlativo(session, tipdoc: str, used_numero: str) -> None:
     )
 
 
+def _safe_select_one(session, *, table: str, wanted: list[str], where_sql: str, params: dict) -> dict:
+    cols = _table_columns(session, table)
+    selected = [c for c in wanted if c in cols]
+    if not selected:
+        return {}
+    sql = text(f"SELECT {', '.join(selected)} FROM {table} WHERE {where_sql} LIMIT 1")
+    row = session.execute(sql, params).mappings().first()
+    return dict(row) if row else {}
+
+
 @dataclass(frozen=True)
 class SavedInvoice:
     id: str
@@ -143,10 +153,9 @@ class InvoiceSaveService:
         caja = str(user.get("caja") or "").strip()
         empresa = str(user.get("empresa") or user.get("company_code") or "").strip()
 
-        fecha = str(invoice.get("fecha") or "").strip()
-        if not fecha:
-            fecha = datetime.now().date().isoformat()
-        hora = datetime.now().strftime("%H:%M:%S")
+        # WinForms arma fechas/hora desde DateTime.Now; usamos ISO para fecha y hh:mm:ss tt para hora.
+        fecha = datetime.now().date().isoformat()
+        hora_12 = datetime.now().strftime("%I:%M:%S %p")
 
         totals = invoice.get("totales") or {}
         subtotal = _d(totals.get("subtotal"))
@@ -173,16 +182,15 @@ class InvoiceSaveService:
             with session_for(settings.db_sysadm) as s:
                 cols = _table_columns(s, header_table)
 
-                # Condición de pago del cliente (cli_condipag) si existe
-                condic = ""
-                try:
-                    r = s.execute(
-                        text("SELECT cli_condipag FROM admclientes WHERE cli_codigo = :c LIMIT 1"),
-                        {"c": cli_codigo},
-                    ).mappings().first()
-                    condic = str((r or {}).get("cli_condipag") or "").strip()
-                except Exception:
-                    condic = ""
+                cli_row = _safe_select_one(
+                    s,
+                    table="admclientes",
+                    wanted=["cli_condipag", "cli_tiplista"],
+                    where_sql="cli_codigo = :c",
+                    params={"c": cli_codigo},
+                )
+                condic = str(cli_row.get("cli_condipag") or "").strip()
+                tipo_lista = str(cli_row.get("cli_tiplista") or "").strip()
 
                 doc_numero = _next_doc_numero(s, tipdoc)
 
@@ -207,46 +215,81 @@ class InvoiceSaveService:
                 tipafe = "CTZ" if tipdoc == "CTZ" else "FAV"
                 cxc = "1" if tipdoc in {"FAV", "CTZ", "NDE"} else "-1"
 
-                hora_12 = datetime.now().strftime("%I:%M:%S %p")
                 sucursal = ("0000" + empresa) if empresa else " "
                 facafe_value = doc_numero if tipdoc == "FAV" else facafe
 
+                numgtr = str(afectada.get("numfis") or "").strip() or " "
+                if tipdoc == "FAV":
+                    numgtr = " "
+
                 header = {
-                    "dcli_numero": doc_numero,
-                    "dcli_tipdoc": tipdoc,
-                    "dcli_codigo": cli_codigo,
-                    "dcli_codven": vend_codigo,
-                    "dcli_caja": caja,
-                    "dcli_fecha": fecha,
-                    "dcli_hora": hora_12,
-                    "dcli_estado": estado,
-                    "dcli_estatus": estado,
-                    "dcli_tiptra": tiptra,
-                    "dcli_tipafe": tipafe,
-                    "dcli_facafe": facafe_value or " ",
-                    "dcli_codmon": "Bs",
-                    "dcli_invmon": "Bs",
-                    "dcli_condic": condic or " ",
+                    # Equivalente a crearSentenciaCabecera (los que existan se insertan)
+                    "dcli_cbtnum": " ",
                     "dcli_cencos": "0000000001",
+                    "dcli_codigo": cli_codigo,
+                    "dcli_codmon": "Bs",
                     "dcli_sucursal": sucursal,
+                    "dcli_transpo": " ",
+                    "dcli_codven": vend_codigo,
+                    "dcli_condic": condic or " ",
+                    "dcli_destino": "Nacional",
+                    "dcli_origen": "Nacional",
+                    "dcli_estado": estado,
+                    "dcli_expexp": estado,
+                    "dcli_facafe": facafe_value or " ",
+                    "dcli_girnum": "",
+                    "dcli_hora": hora_12,
+                    "dcli_modfis": " ",
+                    "dcli_numero": doc_numero,
+                    "dcli_numfis": " ",
+                    "dcli_numgtr": numgtr,
+                    "dcli_plaexp": " ",
+                    "dcli_recnum": " ",
+                    "dcli_serfis": " ",
+                    "dcli_succli": " ",
+                    "dcli_tipafe": tipafe,
+                    "dcli_tipdoc": tipdoc,
+                    "dcli_tiptra": tiptra,
+                    "dcli_usuario": usuario,
+                    "dcli_zona": " ",
+                    "dcli_fecharecep": fecha,
+                    "dcli_fchven": fecha,
+                    "dcli_fecha": fecha,
+                    "dcli_anufis": " ",
+                    "dcli_crerecibo": " ",
+                    "dcli_impreso": "0",
+                    "dcli_invmon": "Bs",
+                    "dcli_estatus": estado,
                     "dcli_baseneta": f"{base:.2f}",
-                    "dcli_mtoiva": f"{iva:.2f}",
-                    "dcli_neto": f"{neto:.2f}",
-                    "dcli_subtotal": f"{base:.2f}",
-                    "dcli_descitem": f"{des_items:.2f}",
+                    "dcli_cxc": cxc,
                     "dcli_dcto": "0.00",
                     "dcli_otroimp": "0",
+                    "dcli_mtocomisio": "0",
+                    "dcli_mtoiva": f"{iva:.2f}",
+                    "dcli_neto": f"{neto:.2f}",
+                    "dcli_numpag": " ",
+                    "dcli_otros": "0",
+                    "dcli_plazo": "0",
+                    "dcli_recargo": "0",
+                    "dclli_valcamb": "1",
+                    "dcli_dctobs": "0.00",
                     "dcli_totdivi": f"{neto:.2f}",
+                    "dcli_descitem": f"{des_items:.2f}",
+                    "dcli_descdoc": "0.00",
                     "dcli_subbase": f"{base_ex:.2f}",
                     "doc_impo": f"{base:.2f}",
                     "dcli_cantproduc": str(int(_d(totals.get("total_prod")) or 0)),
-                    "dcli_plazo": "0",
-                    "dcli_cxc": cxc,
-                    "dclli_valcamb": "1",
-                    "dcli_saldo": f"{saldo:.2f}",
-                    "dcli_impreso": "0",
+                    "dcli_impresora": " ",
+                    "dcli_caja": caja,
                     "dcli_cerrado": "0",
-                    "dcli_usuario": usuario,
+                    "dcli_cosfac": "0.00",
+                    "dcli_cosfac_n": "0.00",
+                    "dcli_cosfac_i": "0.00",
+                    "dcli_base_n": "0.00",
+                    "dcli_base_i": "0.00",
+                    "dcli_saldo": f"{saldo:.2f}",
+                    "dcli_facafe2": " ",
+                    "dcli_subtotal": f"{base:.2f}",
                     "dcli_ivaGN": f"{iva_gn:.2f}",
                     "dcli_ivaRD": f"{iva_rd:.2f}",
                 }
@@ -256,34 +299,79 @@ class InvoiceSaveService:
 
                 _insert_row(s, header_table, cols, header)
 
-                # Items
+                # Items (WinForms: agregarArticulo + guardarDetalleFac)
                 items_cols = _table_columns(s, "adminvmov")
                 for idx, it in enumerate(items, start=1):
+                    inv_code = str(it.get("codigo") or "").strip()
                     qty = _d(it.get("cantidad"))
                     price = _d(it.get("precio"))
                     desc = _d(it.get("desc"))
                     total = _d(it.get("total"))
                     iva_line = _d(it.get("iva"))
                     iva_pct = _d(it.get("iva_pct"))
+
+                    mov_docaso = "FAV" if tipdoc == "DEV" else tipdoc
+                    mov_codtra = "S000" if tipdoc == "FAV" else "E000"
+                    mov_contab = "1" if tipdoc == "DEV" else "-1"
+                    mov_fisico = "1" if tipdoc == "DEV" else "-1"
+                    mov_logico = "1" if tipdoc == "DEV" else "-1"
+
+                    mov_lista = (tipo_lista or "A").strip() or "A"
+                    mov_item = str(idx).zfill(3)
+
                     item_row = {
-                        "mov_docume": doc_numero,
-                        "mov_tipdoc": tipdoc,
-                        "mov_codcta": cli_codigo,
-                        "mov_item": idx,
-                        "mov_codigo": str(it.get("codigo") or "").strip(),
-                        "mov_undmed": str(it.get("unidad") or "").strip(),
-                        "mov_cant": f"{qty:.6f}",
-                        "mov_precio": f"{price:.6f}",
-                        "mov_desc": f"{desc:.6f}",
-                        "mov_total": f"{total:.6f}",
-                        "mov_fecha": fecha,
-                        "mov_hora": hora_12,
-                        "mov_vendedor": vend_codigo,
-                        "mov_iva": f"{iva_line:.6f}",
-                        "mov_ivatip": str(it.get("iva_tipo") or "").strip(),
-                        "mov_porciva": f"{iva_pct:.6f}",
-                        "mov_usuario": usuario,
+                        "mov_docaso": mov_docaso,
+                        "mov_tipoaso": "",
                         "mov_cencos": "0000000001",
+                        "mov_codalm": "000001",
+                        "mov_cdcomp": " ",
+                        "mov_codcta": cli_codigo,
+                        "mov_codigo": inv_code,
+                        "mov_codsuc": sucursal,
+                        "mov_codtra": mov_codtra,
+                        "mov_vendedor": vend_codigo,
+                        "mov_docume": doc_numero,
+                        "mov_hora": hora_12,
+                        "mov_item": mov_item,
+                        "mov_itemaso": " ",
+                        "mov_itemcomp": " ",
+                        "mov_lista": mov_lista,
+                        "mov_lote": " ",
+                        "mov_tipdoc": tipdoc,
+                        "mov_ivatip": str(it.get("iva_tipo") or "").strip(),
+                        "mov_tipo": "V",
+                        "mov_undmed": str(it.get("unidad") or "").strip(),
+                        "mov_usuario": str(user.get("id") or usuario),
+                        "mov_fechven": fecha,
+                        "mov_fecha": fecha,
+                        "mov_bandas": "0",
+                        "mov_cant": f"{qty:.6f}",
+                        "mov_contab": mov_contab,
+                        "mov_costo": "0.00",
+                        "mov_cxund": "1",
+                        "mov_desc": f"{desc:.6f}",
+                        "mov_expendio": "0",
+                        "mov_export": "0",
+                        "mov_fisico": mov_fisico,
+                        "mov_import": "0",
+                        "mov_otimp": "0",
+                        "mov_impprodu": "0",
+                        "mov_invact": "1",
+                        "mov_iva": f"{iva_line:.6f}",
+                        "mov_logico": mov_logico,
+                        "mov_mtocom": "0",
+                        "mov_memo": " ",
+                        "mov_precio": f"{price:.6f}",
+                        "mov_total": f"{total:.6f}",
+                        "mov_talla": "0",
+                        "mov_color": "0",
+                        "mov_arancel": "0",
+                        "mov_kilos": "0",
+                        "mov_impuesto": "0",
+                        "mov_cosmon": f"{price:.6f}",
+                        "mov_totalmon": f"{total:.6f}",
+                        "mov_precio_ini": "0.00",
+                        "mov_porciva": f"{iva_pct:.6f}",
                     }
                     _insert_row(s, "adminvmov", items_cols, item_row)
 
@@ -360,6 +448,41 @@ class InvoiceSaveService:
                         _insert_row(s, "admmovcaja", pagos_cols, cambio_row)
 
                 _update_correlativo(s, tipdoc, doc_numero)
+
+                # CxC (WinForms: guardarSalcli)
+                try:
+                    sal_cols = _table_columns(s, "admsalcli")
+                except Exception:
+                    sal_cols = {}
+
+                if sal_cols:
+                    contado = neto
+                    sal_actual = (contado - pagado) if tipdoc == "FAV" else (pagado - contado)
+                    sal_row = {
+                        "cli_codigo": cli_codigo,
+                        "sal_actual": f"{sal_actual:.2f}",
+                        "TipoDoc": tipdoc,
+                        "NroDocum": doc_numero,
+                        "CodVend": vend_codigo,
+                        "FechaEmision": fecha,
+                        "FechaVenc": fecha,
+                        "FechaCarga": fecha,
+                        "MontoTotal": f"{contado:.2f}",
+                        "MontoCob": f"{contado:.2f}",
+                        "CostoFact": "0.00",
+                        "MontoNac": "0.00",
+                        "MontoImp": "0.00",
+                        "NroCaja": caja,
+                        "CondPago": condic or " ",
+                        "MontoIva": f"{iva:.2f}",
+                        "dcli_cosfac_n": "0.00",
+                        "dcli_cosfac_i": "0.00",
+                        "dcli_facafe": doc_numero,
+                        "dcli_tipdoc2": tipdoc,
+                        "dcli_numfis": " ",
+                        "Status": "0",
+                    }
+                    _insert_row(s, "admsalcli", sal_cols, sal_row)
 
                 return doc_numero, header_table
         except SQLAlchemyError as e:
