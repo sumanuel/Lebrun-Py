@@ -1,0 +1,75 @@
+{
+  "id": "8a0c4fd2164c440b94f0ca51e204c7eb",
+  "saved_at": "2026-01-29T17:45:17",
+  "user": {
+    "username": "caja1",
+    "caja": "0001",
+    "empresa": null
+  },
+  "doc_numero": "000000114805",
+  "invoice": {
+    "tipdoc": "FAV",
+    "fecha": "2026-01-28",
+    "cliente": {
+      "codigo": "E081348892",
+      "rif": "E081348892",
+      "nombre": "GRAZIELLA MELCHIORRI",
+      "direccion": ""
+    },
+    "vendedor": {
+      "codigo": "0000000007",
+      "nombre": "Darlenys Perez"
+    },
+    "obs": "",
+    "cambio_precio": false,
+    "producto": {
+      "codigo": "",
+      "nombre": "",
+      "unidad": "",
+      "cantidad": "1",
+      "precio": ""
+    },
+    "items": [
+      {
+        "codigo": "000000000010003",
+        "nombre": "AAAA ABRAZADERA P/REJA 50 CISA 20631500",
+        "unidad": "PZA",
+        "exento": "",
+        "iva_tipo": "GN",
+        "iva_pct": "12.00",
+        "cantidad": "1.00",
+        "precio": "25.95",
+        "desc": "0.00",
+        "total": "25.95",
+        "iva": "3.114000"
+      }
+    ],
+    "pagos": [
+      {
+        "modo": "Efectivo",
+        "banco": "N/A",
+        "referencia": "N/A",
+        "monto": "29.06"
+      }
+    ],
+    "totales": {
+      "subtotal": "25.95",
+      "des_items": "0.00",
+      "base": "25.95",
+      "total_prod": "1.00",
+      "iva": "3.11",
+      "neto": "29.06",
+      "pagado": "29.06",
+      "cambio": "0.00",
+      "efectivo": "29.06",
+      "cheques": "0.00",
+      "tarjetas": "0.00"
+    },
+    "pago_form": {
+      "modo": "Efectivo",
+      "banco": "",
+      "ref": "",
+      "monto": ""
+    }
+  }
+}
