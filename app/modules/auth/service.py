@@ -45,4 +45,6 @@ class AuthService:
             "username": str(user_row["usu_nombre"]),
             "menu_map": menu_map,
             "caja": str(caja) if caja is not None else None,
+            "company_code": str(company_code),
+            "empresa": str(company_code),
         }

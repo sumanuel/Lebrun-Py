@@ -47,21 +47,46 @@ def _insert_row(session, table: str, cols: dict[str, dict], data: dict) -> None:
     session.execute(text(f"INSERT INTO {table} ({fields}) VALUES ({binds})"), payload)
 
 
-def _next_doc_numero(session, table: str, tipdoc: str, width: int = 10) -> str:
-    # En el WinForms el correlativo se maneja por tipo de documento.
-    # Implementación inicial: MAX + 1 dentro de la misma tabla.
+def _next_doc_numero(session, tipdoc: str) -> str:
+    """Obtiene el siguiente correlativo del sistema (WinForms) por tipo documento.
+
+    Tabla: admtipdoccli.ctd_correlativo
+    - El WinForms lee ctd_correlativo y devuelve +1 (12 dígitos).
+    - Luego, al guardar, actualiza ctd_correlativo al número usado.
+
+    Aquí lo hacemos de forma transaccional con FOR UPDATE para evitar duplicados.
+    """
+
     row = session.execute(
         text(
-            f"""
-            SELECT COALESCE(MAX(CAST(dcli_numero AS UNSIGNED)), 0) AS mx
-            FROM {table}
-            WHERE dcli_tipdoc = :tipdoc
+            """
+            SELECT ctd_correlativo
+            FROM admtipdoccli
+            WHERE ctd_tipo = :tipdoc
+            FOR UPDATE
             """
         ),
         {"tipdoc": tipdoc},
     ).mappings().first()
-    mx = int(row.get("mx") or 0) if row else 0
-    return _zpad(mx + 1, width)
+    current_s = str((row or {}).get("ctd_correlativo") or "").strip()
+    current = int(current_s or "0")
+    return str(current + 1).zfill(12)
+
+
+def _update_correlativo(session, tipdoc: str, used_numero: str) -> None:
+    used_numero = str(used_numero or "").strip()
+    if not used_numero:
+        return
+    session.execute(
+        text(
+            """
+            UPDATE admtipdoccli
+            SET ctd_correlativo = :used
+            WHERE ctd_tipo = :tipdoc
+            """
+        ),
+        {"used": used_numero, "tipdoc": tipdoc},
+    )
 
 
 @dataclass(frozen=True)
@@ -116,6 +141,7 @@ class InvoiceSaveService:
         cli_codigo = str(cliente.get("codigo") or "").strip()
         vend_codigo = str(vendedor.get("codigo") or "").strip()
         caja = str(user.get("caja") or "").strip()
+        empresa = str(user.get("empresa") or user.get("company_code") or "").strip()
 
         fecha = str(invoice.get("fecha") or "").strip()
         if not fecha:
@@ -140,150 +166,202 @@ class InvoiceSaveService:
         afectada = invoice.get("afectada") or {}
         facafe = str(afectada.get("numero") or "").strip()
 
-        header_tables = ["admdoccli2", "admdoccli"]
+        # admdoccli2 suele llenarse por trigger desde admdoccli.
+        header_table = "admdoccli"
 
         try:
             with session_for(settings.db_sysadm) as s:
-                last_error: Exception | None = None
-                for table in header_tables:
-                    try:
-                        cols = _table_columns(s, table)
-                        doc_numero = _next_doc_numero(s, table, tipdoc)
+                cols = _table_columns(s, header_table)
 
-                        header = {
-                            "dcli_numero": doc_numero,
-                            "dcli_tipdoc": tipdoc,
-                            "dcli_codigo": cli_codigo,
-                            "dcli_codven": vend_codigo,
-                            "dcli_caja": caja,
-                            "dcli_fecha": fecha,
-                            "dcli_hora": hora,
-                            "dcli_estado": estado,
-                            "dcli_baseneta": f"{base:.2f}",
-                            "dcli_mtoiva": f"{iva:.2f}",
-                            "dcli_neto": f"{neto:.2f}",
-                            "dcli_subtotal": f"{subtotal:.2f}",
-                            "dcli_descitem": f"{des_items:.2f}",
-                            "dcli_saldo": f"{saldo:.2f}",
-                            "dcli_impreso": "0",
-                            "dcli_cerrado": "0",
-                            "dcli_usuario": usuario,
+                # Condición de pago del cliente (cli_condipag) si existe
+                condic = ""
+                try:
+                    r = s.execute(
+                        text("SELECT cli_condipag FROM admclientes WHERE cli_codigo = :c LIMIT 1"),
+                        {"c": cli_codigo},
+                    ).mappings().first()
+                    condic = str((r or {}).get("cli_condipag") or "").strip()
+                except Exception:
+                    condic = ""
+
+                doc_numero = _next_doc_numero(s, tipdoc)
+
+                # Totales derivados adicionales (para acercarnos a WinForms)
+                items = invoice.get("items") or []
+                base_ex = Decimal("0")
+                iva_gn = Decimal("0")
+                iva_rd = Decimal("0")
+                for it in items:
+                    total_line = _d(it.get("total"))
+                    iva_line = _d(it.get("iva"))
+                    exento = str(it.get("exento") or "").strip().lower() in {"1", "si", "sí", "s", "true", "t", "y", "yes"}
+                    if exento:
+                        base_ex += total_line
+                    iva_tipo = str(it.get("iva_tipo") or "").strip().upper()
+                    if iva_tipo == "GN":
+                        iva_gn += iva_line
+                    elif iva_tipo in {"RD", "A"}:
+                        iva_rd += iva_line
+
+                tiptra = "D" if tipdoc == "FAV" else "C"
+                tipafe = "CTZ" if tipdoc == "CTZ" else "FAV"
+                cxc = "1" if tipdoc in {"FAV", "CTZ", "NDE"} else "-1"
+
+                hora_12 = datetime.now().strftime("%I:%M:%S %p")
+                sucursal = ("0000" + empresa) if empresa else " "
+                facafe_value = doc_numero if tipdoc == "FAV" else facafe
+
+                header = {
+                    "dcli_numero": doc_numero,
+                    "dcli_tipdoc": tipdoc,
+                    "dcli_codigo": cli_codigo,
+                    "dcli_codven": vend_codigo,
+                    "dcli_caja": caja,
+                    "dcli_fecha": fecha,
+                    "dcli_hora": hora_12,
+                    "dcli_estado": estado,
+                    "dcli_estatus": estado,
+                    "dcli_tiptra": tiptra,
+                    "dcli_tipafe": tipafe,
+                    "dcli_facafe": facafe_value or " ",
+                    "dcli_codmon": "Bs",
+                    "dcli_invmon": "Bs",
+                    "dcli_condic": condic or " ",
+                    "dcli_cencos": "0000000001",
+                    "dcli_sucursal": sucursal,
+                    "dcli_baseneta": f"{base:.2f}",
+                    "dcli_mtoiva": f"{iva:.2f}",
+                    "dcli_neto": f"{neto:.2f}",
+                    "dcli_subtotal": f"{base:.2f}",
+                    "dcli_descitem": f"{des_items:.2f}",
+                    "dcli_dcto": "0.00",
+                    "dcli_otroimp": "0",
+                    "dcli_totdivi": f"{neto:.2f}",
+                    "dcli_subbase": f"{base_ex:.2f}",
+                    "doc_impo": f"{base:.2f}",
+                    "dcli_cantproduc": str(int(_d(totals.get("total_prod")) or 0)),
+                    "dcli_plazo": "0",
+                    "dcli_cxc": cxc,
+                    "dclli_valcamb": "1",
+                    "dcli_saldo": f"{saldo:.2f}",
+                    "dcli_impreso": "0",
+                    "dcli_cerrado": "0",
+                    "dcli_usuario": usuario,
+                    "dcli_ivaGN": f"{iva_gn:.2f}",
+                    "dcli_ivaRD": f"{iva_rd:.2f}",
+                }
+
+                if supervisor_user:
+                    header.setdefault("dcli_aprob1", supervisor_user)
+
+                _insert_row(s, header_table, cols, header)
+
+                # Items
+                items_cols = _table_columns(s, "adminvmov")
+                for idx, it in enumerate(items, start=1):
+                    qty = _d(it.get("cantidad"))
+                    price = _d(it.get("precio"))
+                    desc = _d(it.get("desc"))
+                    total = _d(it.get("total"))
+                    iva_line = _d(it.get("iva"))
+                    iva_pct = _d(it.get("iva_pct"))
+                    item_row = {
+                        "mov_docume": doc_numero,
+                        "mov_tipdoc": tipdoc,
+                        "mov_codcta": cli_codigo,
+                        "mov_item": idx,
+                        "mov_codigo": str(it.get("codigo") or "").strip(),
+                        "mov_undmed": str(it.get("unidad") or "").strip(),
+                        "mov_cant": f"{qty:.6f}",
+                        "mov_precio": f"{price:.6f}",
+                        "mov_desc": f"{desc:.6f}",
+                        "mov_total": f"{total:.6f}",
+                        "mov_fecha": fecha,
+                        "mov_hora": hora_12,
+                        "mov_vendedor": vend_codigo,
+                        "mov_iva": f"{iva_line:.6f}",
+                        "mov_ivatip": str(it.get("iva_tipo") or "").strip(),
+                        "mov_porciva": f"{iva_pct:.6f}",
+                        "mov_usuario": usuario,
+                        "mov_cencos": "0000000001",
+                    }
+                    _insert_row(s, "adminvmov", items_cols, item_row)
+
+                # Pagos
+                pagos = invoice.get("pagos") or []
+                if pagos:
+                    pagos_cols = _table_columns(s, "admmovcaja")
+                    r = s.execute(
+                        text("SELECT COALESCE(MAX(CAST(movc_numtra AS UNSIGNED)), 0) AS mx FROM admmovcaja"),
+                        {},
+                    ).mappings().first()
+                    movc_numtra = int((r or {}).get("mx") or 0)
+
+                    def map_forpag(modo: str) -> str:
+                        m = (modo or "").strip().lower()
+                        if m == "efectivo":
+                            return "EFECTIVO"
+                        if "cheque" in m:
+                            return "CHEQUE"
+                        if "debito" in m:
+                            return "TARJETA-D"
+                        if "credito" in m:
+                            return "TARJETA-C"
+                        return (modo or "").strip().upper() or "OTRO"
+
+                    for p in pagos:
+                        movc_numtra += 1
+                        monto = _d(p.get("monto"))
+                        forpag = map_forpag(str(p.get("modo") or ""))
+                        pago_row = {
+                            "movc_numtra": movc_numtra,
+                            "movc_codmaestr": cli_codigo,
+                            "movc_numdoc": doc_numero,
+                            "movc_descrioper": "Mov Caja en Ventas",
+                            "movc_operacion": "D",
+                            "movc_forpag": forpag,
+                            "mocv_forpag": forpag,
+                            "movc_tipoctaban": str(p.get("banco") or "").strip() or "N/A",
+                            "movc_numero": str(p.get("referencia") or "").strip() or " ",
+                            "movc_monto": f"{monto:.2f}",
+                            "movc_fchemision": fecha,
+                            "movc_hora": hora_12,
+                            "movc_vendedor": vend_codigo,
+                            "movc_codcaja": caja,
+                            "movc_tipomovc": "MOVCAJAV",
+                            "movc_estatus": "Activo",
+                            "movc_valcam": "0.00",
+                            "movc_memo": " ",
                         }
+                        _insert_row(s, "admmovcaja", pagos_cols, pago_row)
 
-                        if facafe:
-                            header["dcli_facafe"] = facafe
+                    if cambio > Decimal("0"):
+                        movc_numtra += 1
+                        cambio_row = {
+                            "movc_numtra": movc_numtra,
+                            "movc_codmaestr": cli_codigo,
+                            "movc_numdoc": doc_numero,
+                            "movc_descrioper": "Mov Caja en Ventas",
+                            "movc_operacion": "D",
+                            "movc_forpag": "CAMBIO",
+                            "mocv_forpag": "CAMBIO",
+                            "movc_tipoctaban": "N/A",
+                            "movc_numero": " ",
+                            "movc_monto": f"{cambio:.2f}",
+                            "movc_fchemision": fecha,
+                            "movc_hora": hora_12,
+                            "movc_vendedor": vend_codigo,
+                            "movc_codcaja": caja,
+                            "movc_tipomovc": "MOVCAJAV",
+                            "movc_estatus": "Activo",
+                            "movc_valcam": f"{cambio:.2f}",
+                            "movc_memo": " ",
+                        }
+                        _insert_row(s, "admmovcaja", pagos_cols, cambio_row)
 
-                        if supervisor_user:
-                            header.setdefault("dcli_aprob1", supervisor_user)
+                _update_correlativo(s, tipdoc, doc_numero)
 
-                        _insert_row(s, table, cols, header)
-
-                        # Items
-                        items_cols = _table_columns(s, "adminvmov")
-                        items = invoice.get("items") or []
-                        for idx, it in enumerate(items, start=1):
-                            qty = _d(it.get("cantidad"))
-                            price = _d(it.get("precio"))
-                            desc = _d(it.get("desc"))
-                            total = _d(it.get("total"))
-                            iva_line = _d(it.get("iva"))
-                            item_row = {
-                                "mov_docume": doc_numero,
-                                "mov_tipdoc": tipdoc,
-                                "mov_codcta": cli_codigo,
-                                "mov_item": idx,
-                                "mov_codigo": str(it.get("codigo") or "").strip(),
-                                "mov_undmed": str(it.get("unidad") or "").strip(),
-                                "mov_cant": f"{qty:.6f}",
-                                "mov_precio": f"{price:.6f}",
-                                "mov_desc": f"{desc:.6f}",
-                                "mov_total": f"{total:.6f}",
-                                "mov_fecha": fecha,
-                                "mov_hora": hora,
-                                "mov_vendedor": vend_codigo,
-                            }
-                            # IVA si existe en la tabla
-                            item_row["mov_iva"] = f"{iva_line:.6f}"
-                            item_row["mov_ivatip"] = str(it.get("iva_tipo") or "").strip()
-                            _insert_row(s, "adminvmov", items_cols, item_row)
-
-                        # Pagos
-                        pagos = invoice.get("pagos") or []
-                        if pagos:
-                            pagos_cols = _table_columns(s, "admmovcaja")
-                            # movc_numtra: correlativo simple
-                            r = s.execute(text("SELECT COALESCE(MAX(CAST(movc_numtra AS UNSIGNED)), 0) AS mx FROM admmovcaja"), {}).mappings().first()
-                            movc_numtra = int((r or {}).get("mx") or 0)
-
-                            def map_forpag(modo: str) -> str:
-                                m = (modo or "").strip().lower()
-                                if m == "efectivo":
-                                    return "EFECTIVO"
-                                if "cheque" in m:
-                                    return "CHEQUE"
-                                if "debito" in m:
-                                    return "TARJETA-D"
-                                if "credito" in m:
-                                    return "TARJETA-C"
-                                return (modo or "").strip().upper() or "OTRO"
-
-                            for p in pagos:
-                                movc_numtra += 1
-                                monto = _d(p.get("monto"))
-                                forpag = map_forpag(str(p.get("modo") or ""))
-                                pago_row = {
-                                    "movc_numtra": movc_numtra,
-                                    "movc_codmaestr": cli_codigo,
-                                    "movc_numdoc": doc_numero,
-                                    "movc_descrioper": "Mov Caja en Ventas",
-                                    "movc_operacion": "D",
-                                    "movc_forpag": forpag,
-                                    "mocv_forpag": forpag,
-                                    "movc_tipoctaban": str(p.get("banco") or "").strip() or "N/A",
-                                    "movc_numero": str(p.get("referencia") or "").strip() or " ",
-                                    "movc_monto": f"{monto:.2f}",
-                                    "movc_fchemision": fecha,
-                                    "movc_hora": hora,
-                                    "movc_vendedor": vend_codigo,
-                                    "movc_codcaja": caja,
-                                    "movc_tipomovc": "MOVCAJAV",
-                                    "movc_estatus": "Activo",
-                                    "movc_valcam": "0.00",
-                                    "movc_memo": " ",
-                                }
-                                _insert_row(s, "admmovcaja", pagos_cols, pago_row)
-
-                            # Cambio (si aplica)
-                            if cambio > Decimal("0"):
-                                movc_numtra += 1
-                                cambio_row = {
-                                    "movc_numtra": movc_numtra,
-                                    "movc_codmaestr": cli_codigo,
-                                    "movc_numdoc": doc_numero,
-                                    "movc_descrioper": "Mov Caja en Ventas",
-                                    "movc_operacion": "D",
-                                    "movc_forpag": "CAMBIO",
-                                    "mocv_forpag": "CAMBIO",
-                                    "movc_tipoctaban": "N/A",
-                                    "movc_numero": " ",
-                                    "movc_monto": f"{cambio:.2f}",
-                                    "movc_fchemision": fecha,
-                                    "movc_hora": hora,
-                                    "movc_vendedor": vend_codigo,
-                                    "movc_codcaja": caja,
-                                    "movc_tipomovc": "MOVCAJAV",
-                                    "movc_estatus": "Activo",
-                                    "movc_valcam": f"{cambio:.2f}",
-                                    "movc_memo": " ",
-                                }
-                                _insert_row(s, "admmovcaja", pagos_cols, cambio_row)
-
-                        return doc_numero, table
-                    except Exception as e:
-                        last_error = e
-                        continue
-
-                raise last_error or RuntimeError("No se pudo guardar en admdoccli2/admdoccli")
+                return doc_numero, header_table
         except SQLAlchemyError as e:
             msg = str(getattr(getattr(e, "orig", None), "args", None) or str(e))
             raise DatabaseUnavailable(f"Error guardando factura (sisadm): {msg}") from e
