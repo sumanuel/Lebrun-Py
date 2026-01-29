@@ -170,7 +170,8 @@ class InvoiceSaveService:
         if saldo < Decimal("0"):
             saldo = Decimal("0")
         estado = "Pagado" if pagado >= neto else "Activo"
-        usuario = str(user.get("username") or "").strip()
+        usuario_codigo = str(user.get("id") or "").strip()
+        usuario_nombre = str(user.get("username") or "").strip()
 
         afectada = invoice.get("afectada") or {}
         facafe = str(afectada.get("numero") or "").strip()
@@ -185,12 +186,33 @@ class InvoiceSaveService:
                 cli_row = _safe_select_one(
                     s,
                     table="admclientes",
-                    wanted=["cli_condipag", "cli_tiplista"],
+                    wanted=["cli_condipag", "cli_tiplista", "Cli_lisprecio"],
                     where_sql="cli_codigo = :c",
                     params={"c": cli_codigo},
                 )
-                condic = str(cli_row.get("cli_condipag") or "").strip()
-                tipo_lista = str(cli_row.get("cli_tiplista") or "").strip()
+
+                # WinForms:
+                # - admclientes.cli_condipag guarda DESCRIPCION (p.ej. "Contado")
+                # - se traduce a admcondpago.conp_codigo (p.ej. "07") y eso va a dcli_condic
+                condic_desc = str(cli_row.get("cli_condipag") or "").strip()
+                condic = ""
+                if condic_desc:
+                    if condic_desc.isdigit():
+                        condic = condic_desc
+                    else:
+                        try:
+                            conp_row = _safe_select_one(
+                                s,
+                                table="admcondpago",
+                                wanted=["conp_codigo"],
+                                where_sql="conp_descripcion = :d",
+                                params={"d": condic_desc},
+                            )
+                            condic = str(conp_row.get("conp_codigo") or "").strip()
+                        except Exception:
+                            condic = ""
+
+                tipo_lista = str(cli_row.get("cli_tiplista") or cli_row.get("Cli_lisprecio") or "").strip()
 
                 doc_numero = _next_doc_numero(s, tipdoc)
 
@@ -250,7 +272,7 @@ class InvoiceSaveService:
                     "dcli_tipafe": tipafe,
                     "dcli_tipdoc": tipdoc,
                     "dcli_tiptra": tiptra,
-                    "dcli_usuario": usuario,
+                    "dcli_usuario": usuario_codigo or usuario_nombre,
                     "dcli_zona": " ",
                     "dcli_fecharecep": fecha,
                     "dcli_fchven": fecha,
@@ -341,7 +363,7 @@ class InvoiceSaveService:
                         "mov_ivatip": str(it.get("iva_tipo") or "").strip(),
                         "mov_tipo": "V",
                         "mov_undmed": str(it.get("unidad") or "").strip(),
-                        "mov_usuario": str(user.get("id") or usuario),
+                        "mov_usuario": usuario_codigo or usuario_nombre,
                         "mov_fechven": fecha,
                         "mov_fecha": fecha,
                         "mov_bandas": "0",

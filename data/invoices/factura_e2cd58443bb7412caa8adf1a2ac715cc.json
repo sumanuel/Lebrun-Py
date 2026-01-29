@@ -1,0 +1,75 @@
+{
+  "id": "e2cd58443bb7412caa8adf1a2ac715cc",
+  "saved_at": "2026-01-29T18:00:00",
+  "user": {
+    "username": "caja1",
+    "caja": "0001",
+    "empresa": null
+  },
+  "doc_numero": "000000114806",
+  "invoice": {
+    "tipdoc": "FAV",
+    "fecha": "2026-01-29",
+    "cliente": {
+      "codigo": "E081097751",
+      "rif": "E081097751",
+      "nombre": "ALLAN LAMB",
+      "direccion": ""
+    },
+    "vendedor": {
+      "codigo": "0000000012",
+      "nombre": "Yenny Gonzalez"
+    },
+    "obs": "",
+    "cambio_precio": false,
+    "producto": {
+      "codigo": "",
+      "nombre": "",
+      "unidad": "",
+      "cantidad": "1",
+      "precio": ""
+    },
+    "items": [
+      {
+        "codigo": "000000000010003",
+        "nombre": "AAAA ABRAZADERA P/REJA 50 CISA 20631500",
+        "unidad": "PZA",
+        "exento": "",
+        "iva_tipo": "GN",
+        "iva_pct": "12.00",
+        "cantidad": "2.00",
+        "precio": "25.95",
+        "desc": "0.00",
+        "total": "51.90",
+        "iva": "6.228000"
+      }
+    ],
+    "pagos": [
+      {
+        "modo": "Efectivo",
+        "banco": "N/A",
+        "referencia": "N/A",
+        "monto": "58.13"
+      }
+    ],
+    "totales": {
+      "subtotal": "51.90",
+      "des_items": "0.00",
+      "base": "51.90",
+      "total_prod": "2.00",
+      "iva": "6.23",
+      "neto": "58.13",
+      "pagado": "58.13",
+      "cambio": "0.00",
+      "efectivo": "58.13",
+      "cheques": "0.00",
+      "tarjetas": "0.00"
+    },
+    "pago_form": {
+      "modo": "Efectivo",
+      "banco": "",
+      "ref": "",
+      "monto": ""
+    }
+  }
+}
