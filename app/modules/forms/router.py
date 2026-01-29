@@ -36,6 +36,7 @@ from app.modules.fiscal.service import FiscalService
 from app.modules.menu.service import MenuService
 from app.modules.vendedores.repository import VendedoresRepository
 from app.modules.ventas.repository import VentasRepository
+from app.modules.facturacion.save_service import InvoiceSaveService
 
 router = APIRouter(tags=["forms"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -704,6 +705,8 @@ def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
     recalc(inv)
     request.session["factura"] = inv
 
+    message = request.session.pop("flash", None)
+
     return templates.TemplateResponse(
         "facturacion/frm_factura.html",
         {
@@ -713,7 +716,7 @@ def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
             "active_href": "/facturacion/factura/nueva",
             "title": "Factura - Lebrun",
             "page_title": "Factura",
-            "message": None,
+            "message": message,
             "inv": inv,
             "hide_topbar": True,
         },
@@ -887,24 +890,51 @@ def facturacion_factura_nueva_post(
     recalc(inv)
     request.session["factura"] = inv
 
-    return templates.TemplateResponse(
-        "facturacion/frm_factura.html",
-        {
-            "request": request,
-            "user": user,
-            "menu": menu,
-            "active_href": "/facturacion/factura/nueva",
-            "title": "Factura - Lebrun",
-            "page_title": "Factura",
-            "message": message,
-            "inv": inv,
-            "hide_topbar": True,
-        },
-    )
+    # PRG: evitar duplicados al refrescar (F5 reenvía el último POST)
+    if message:
+        request.session["flash"] = message
+    return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
 
 
-@router.get("/facturacion/factura/confirmar")
-def facturacion_factura_confirmar(request: Request):
+def _validate_factura_ready(inv: dict) -> str | None:
+    if not (inv.get("items") or []):
+        return "El documento Debe Tener algun Articulo!!"
+    vend_codigo = str((inv.get("vendedor") or {}).get("codigo") or "").strip()
+    if not vend_codigo:
+        return "Debe Seleccionar un vendedor Activo!!"
+    cli_codigo = str((inv.get("cliente") or {}).get("codigo") or "").strip()
+    if not cli_codigo:
+        return "Debe Seleccionar un cliente."
+    return None
+
+
+def _requires_supervisor(inv: dict) -> bool:
+    from app.modules.facturacion.factura_session import _d
+
+    neto = _d((inv.get("totales") or {}).get("neto"))
+    pagado = _d((inv.get("totales") or {}).get("pagado"))
+    return pagado < neto
+
+
+def _save_factura(*, inv: dict, user: dict, print_enabled: bool, supervisor_user: str | None = None) -> tuple[str, str, str | None]:
+    svc = InvoiceSaveService()
+    doc_numero, table = svc.save_to_db(invoice=inv, user=user, supervisor_user=supervisor_user)
+    snap = svc.save_snapshot(invoice=inv, user=user, doc_numero=doc_numero)
+
+    job_id: str | None = None
+    if print_enabled:
+        caja = user.get("caja")
+        job_id = FiscalService().enqueue_print_doc(
+            caja=str(caja) if caja is not None else None,
+            requested_by=str(user.get("username") or ""),
+            payload={"invoice_id": snap.id, "doc_numero": doc_numero, "tipdoc": inv.get("tipdoc"), "table": table},
+        )
+
+    return doc_numero, snap.id, job_id
+
+
+@router.post("/facturacion/factura/confirmar")
+def facturacion_factura_confirmar_post(request: Request, print: str = Form("0")):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
@@ -917,40 +947,87 @@ def facturacion_factura_confirmar(request: Request):
     inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
     recalc(inv)
     request.session["factura"] = inv
-
     tipdoc = (inv.get("tipdoc") or "FAV").strip().upper() or "FAV"
 
-    if not (inv.get("items") or []):
-        request.session["flash"] = "El documento Debe Tener algun Articulo!!"
+    msg = _validate_factura_ready(inv)
+    if msg:
+        request.session["flash"] = msg
         return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
 
-    vend_codigo = str((inv.get("vendedor") or {}).get("codigo") or "").strip()
-    if not vend_codigo:
-        request.session["flash"] = "Debe Seleccionar un vendedor Activo!!"
+    if _requires_supervisor(inv) and not request.session.get("factura_supervisor_ok"):
+        request.session["factura_confirm_pending"] = {"print": (print or "0").strip()}
+        return RedirectResponse(url="/facturacion/clave-confirmacion?scope=factura&next=/facturacion/factura/confirmar/finish", status_code=303)
+
+    # Sin supervisor o ya autorizado
+    try:
+        do_print = (print or "0").strip() == "1" and bool(getattr(settings, "invoice_print_enabled", False))
+        doc_numero, snap_id, job_id = _save_factura(inv=inv, user=user, print_enabled=do_print)
+        if do_print:
+            request.session["flash"] = (
+                f"Documento guardado: {doc_numero}. Snapshot: {snap_id}. Impresión encolada: {job_id}"
+                if job_id
+                else f"Documento guardado: {doc_numero}. Snapshot: {snap_id}."
+            )
+        else:
+            request.session["flash"] = f"Documento guardado (sin imprimir): {doc_numero}. Snapshot: {snap_id}"
+        request.session["factura"] = clear_invoice(inv)
+    except Exception as e:
+        request.session["flash"] = f"No se pudo guardar: {e}"
         return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
 
-    cli_codigo = str((inv.get("cliente") or {}).get("codigo") or "").strip()
-    if not cli_codigo:
-        request.session["flash"] = "Debe Seleccionar un cliente."
+    return RedirectResponse(url=f"/facturacion/facturas?tipdoc={tipdoc}", status_code=303)
+
+
+@router.get("/facturacion/factura/confirmar/finish")
+def facturacion_factura_confirmar_finish(request: Request):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    inv = request.session.get("factura")
+    pending = request.session.pop("factura_confirm_pending", None)
+    tipdoc = "FAV"
+    if isinstance(inv, dict):
+        tipdoc = (inv.get("tipdoc") or "FAV").strip().upper() or "FAV"
+
+    if not isinstance(inv, dict) or not pending:
+        request.session["flash"] = "No hay confirmación pendiente."
         return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
 
-    from app.modules.facturacion.factura_session import _d
+    if not request.session.get("factura_supervisor_ok"):
+        request.session["flash"] = "Se requiere clave de supervisor."
+        return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
 
-    neto = _d((inv.get("totales") or {}).get("neto"))
-    pagado = _d((inv.get("totales") or {}).get("pagado"))
+    # Consumir autorización (one-shot) pero conservar el usuario para auditar
+    supervisor_user = str(request.session.get("factura_supervisor_user") or "").strip() or None
+    request.session.pop("factura_supervisor_ok", None)
+    request.session.pop("factura_supervisor_user", None)
 
-    requiere_supervisor = pagado < neto
-    if requiere_supervisor and not request.session.get("factura_supervisor_ok"):
-        next_url = "/facturacion/factura/confirmar"
-        return RedirectResponse(url=f"/facturacion/clave-confirmacion?scope=factura&next={next_url}", status_code=303)
+    inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
+    recalc(inv)
 
-    if requiere_supervisor:
-        request.session.pop("factura_supervisor_ok", None)
-        request.session.pop("factura_supervisor_user", None)
+    msg = _validate_factura_ready(inv)
+    if msg:
+        request.session["flash"] = msg
+        return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
 
-    # Stub de guardado/impresión: dejamos el hook y limpiamos la sesión como en WinForms al finalizar.
-    request.session["flash"] = "Documento confirmado (stub). Próximo paso: guardar + imprimir."
-    request.session["factura"] = clear_invoice(inv)
+    try:
+        print_flag = str((pending or {}).get("print") or "0").strip()
+        do_print = print_flag == "1" and bool(getattr(settings, "invoice_print_enabled", False))
+        doc_numero, snap_id, job_id = _save_factura(inv=inv, user=user, print_enabled=do_print, supervisor_user=supervisor_user)
+        if do_print:
+            request.session["flash"] = (
+                f"Documento guardado: {doc_numero}. Snapshot: {snap_id}. Impresión encolada: {job_id}"
+                if job_id
+                else f"Documento guardado: {doc_numero}. Snapshot: {snap_id}."
+            )
+        else:
+            request.session["flash"] = f"Documento guardado (sin imprimir): {doc_numero}. Snapshot: {snap_id}"
+        request.session["factura"] = clear_invoice(inv)
+    except Exception as e:
+        request.session["flash"] = f"No se pudo guardar: {e}"
+        return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
+
     return RedirectResponse(url=f"/facturacion/facturas?tipdoc={tipdoc}", status_code=303)
 
 

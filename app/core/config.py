@@ -34,6 +34,10 @@ class Settings:
     fiscal_agent_token: str = _env("LEBRUN_FISCAL_AGENT_TOKEN", "")
     fiscal_jobs_path: Path = Path(_env("LEBRUN_FISCAL_JOBS_PATH", str(PROJECT_ROOT / "data" / "fiscal_jobs.json")))
 
+    # Facturación (guardado/impresión)
+    invoices_path: Path = Path(_env("LEBRUN_INVOICES_PATH", str(PROJECT_ROOT / "data" / "invoices")))
+    invoice_print_enabled: bool = _env("LEBRUN_INVOICE_PRINT_ENABLED", "0").strip() in {"1", "true", "True", "yes", "YES"}
+
     templates_dir: Path = PROJECT_ROOT / "app" / "web" / "templates"
 
 

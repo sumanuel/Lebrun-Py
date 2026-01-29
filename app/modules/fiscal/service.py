@@ -20,3 +20,11 @@ class FiscalService:
             payload={"report": report_type, "requested_by": requested_by},
         )
         return job.id
+
+    def enqueue_print_doc(self, *, caja: str | None, requested_by: str | None, payload: dict) -> str:
+        job = self.store.enqueue(
+            caja=str(caja) if caja is not None else None,
+            job_type="PRINT_DOC",
+            payload={"requested_by": requested_by, **(payload or {})},
+        )
+        return job.id

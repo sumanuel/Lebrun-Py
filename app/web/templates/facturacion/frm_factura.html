@@ -522,11 +522,10 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 
                 <div class="toolbar" style="margin-top: 12px">
                   <div class="toolbar__left">
-                    <a
-                      class="btn btn--ghost"
-                      href="/facturacion/factura/confirmar"
-                      >Confirmar Documento</a
-                    >
+                    <form method="post" action="/facturacion/factura/confirmar" style="display: inline">
+                      <button class="btn btn--ghost" type="submit" name="print" value="0">Guardar (sin imprimir)</button>
+                      <button class="btn btn--ghost" type="submit" name="print" value="1">Guardar e Imprimir</button>
+                    </form>
                     <a
                       class="btn btn--ghost"
                       href="/facturacion/facturas?tipdoc={{ tipdoc }}"
