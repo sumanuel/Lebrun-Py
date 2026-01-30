@@ -9,6 +9,16 @@ from app.db.session import session_for
 
 
 class FacturacionRepository:
+    def _table_columns(self, table: str) -> set[str]:
+        sql = text(f"SHOW COLUMNS FROM {table}")
+        with session_for(settings.db_sysadm) as s:
+            rows = s.execute(sql, {}).mappings().all()
+            return {str(r.get("Field") or "").strip() for r in rows if str(r.get("Field") or "").strip()}
+
+    def _pick_columns(self, *, table: str, wanted: list[str]) -> list[str]:
+        cols = self._table_columns(table)
+        return [c for c in wanted if c in cols]
+
     def _list_documentos_from_table(
         self,
         *,
@@ -129,16 +139,39 @@ class FacturacionRepository:
             return None
 
         def _from_table(table: str) -> dict | None:
+            wanted = [
+                "dcli_numero",
+                "dcli_codigo",
+                "dcli_fecha",
+                "dcli_tipdoc",
+                "dcli_codmon",
+                "dcli_estado",
+                "dcli_neto",
+                "dcli_baseneta",
+                "dcli_iva",
+                "dcli_total",
+                "dcli_desc",
+                "dcli_condic",
+                "dcli_vendedor",
+                "dcli_caja",
+                "dcli_numfis",
+                "dcli_serfis",
+                "dcli_impfis",
+                "dcli_impreso",
+                "dcli_facafe",
+                "dcli_tiptra",
+                "dcli_observa",
+            ]
+            cols = self._pick_columns(table=table, wanted=wanted)
+            select_cols = ",\n                  ".join([f"{table}.{c}" for c in cols])
+            if not select_cols:
+                select_cols = f"{table}.dcli_numero, {table}.dcli_codigo"
+
             sql = text(
                 f"""
                 SELECT
-                  {table}.dcli_numero,
-                  {table}.dcli_codigo,
-                  admclientes.cli_nombre,
-                  {table}.dcli_fecha,
-                  {table}.dcli_tipdoc,
-                  {table}.dcli_codmon,
-                  {table}.dcli_numfis
+                  {select_cols},
+                  admclientes.cli_nombre
                 FROM {table}
                 LEFT OUTER JOIN admclientes
                   ON admclientes.cli_codigo = {table}.dcli_codigo
@@ -197,3 +230,49 @@ class FacturacionRepository:
         except SQLAlchemyError as e:
             msg = str(getattr(getattr(e, "orig", None), "args", None) or str(e))
             raise DatabaseUnavailable(f"Error al cargar items de factura (sisadm): {msg}") from e
+
+    def list_items_documento(self, *, numero: str, codigo: str, tipdoc: str) -> list[dict]:
+        # Alias más claro para ver-documento (aplica a FAV/DEV/NDE).
+        return self.list_items_factura_afectada(numero=numero, codigo=codigo, tipdoc=tipdoc)
+
+    def list_pagos_documento(self, *, numero: str, codigo: str) -> list[dict]:
+        numero = (numero or "").strip()
+        codigo = (codigo or "").strip()
+        if not numero or not codigo:
+            return []
+
+        wanted = [
+            "movc_numtra",
+            "movc_forpag",
+            "mocv_forpag",
+            "movc_tipoctaban",
+            "movc_numero",
+            "movc_monto",
+            "movc_fchemision",
+            "movc_hora",
+        ]
+
+        def _from_table(table: str) -> list[dict]:
+            cols = self._pick_columns(table=table, wanted=wanted)
+            if not cols:
+                return []
+            select_cols = ",\n              ".join([f"{table}.{c}" for c in cols])
+            sql = text(
+                f"""
+                SELECT
+                  {select_cols}
+                FROM {table}
+                WHERE {table}.movc_numdoc = :numero
+                  AND {table}.movc_codmaestr = :codigo
+                ORDER BY CAST({table}.movc_numtra AS UNSIGNED) ASC
+                """
+            )
+            with session_for(settings.db_sysadm) as s:
+                rows = s.execute(sql, {"numero": numero, "codigo": codigo}).mappings().all()
+                return [dict(r) for r in rows]
+
+        try:
+            return _from_table("admmovcaja")
+        except SQLAlchemyError as e:
+            msg = str(getattr(getattr(e, "orig", None), "args", None) or str(e))
+            raise DatabaseUnavailable(f"Error al cargar pagos (sisadm): {msg}") from e

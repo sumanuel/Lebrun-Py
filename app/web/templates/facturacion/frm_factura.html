@@ -1,5 +1,6 @@
 {% extends "base.html" %} {% block page_title %}Factura{% endblock %} {% block
 sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
+{% set view_only = view_only or False %}
 <style>
   .lookup-modal {
     position: fixed;
@@ -55,6 +56,14 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     background: rgba(255, 255, 255, 0.05);
   }
 </style>
+{% if view_only %}
+<style>
+  /* Modo ver: no permitir edición ni acciones */
+  .view-only-hide {
+    display: none !important;
+  }
+</style>
+{% endif %}
 {% endblock %} {% block content %} {% set tipdoc = inv["tipdoc"] if inv else
 'FAV' %} {% set titulo_doc = 'Factura de Venta' if tipdoc=='FAV' else
 ('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %} {% set pago_form = (inv.get('pago_form') if inv else {}) or {} %}
@@ -71,7 +80,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
         <div class="factura-shell">
           <div class="factura-left">
             <div class="factura-top">
-              <div class="factura-actions">
+              <div class="factura-actions {% if view_only %}view-only-hide{% endif %}">
                 <a
                   class="btn"
                   href="#"
@@ -115,6 +124,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     />
                   </div>
                   <div class="col-1" style="display: flex; align-items: end">
+                    {% if not view_only %}
                     <button
                       class="btn btn--ghost"
                       type="button"
@@ -123,6 +133,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     >
                       🔎
                     </button>
+                    {% endif %}
                   </div>
                   <div class="col-3">
                     <label class="muted">RIF</label>
@@ -135,7 +146,11 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                   </div>
                   <div class="col-4">
                     <label class="muted">Núm Fac</label>
-                    <input class="input" value="(pendiente)" readonly />
+                    <input
+                      class="input"
+                      value="{% if view_only %}{{ inv.get('numero','') }}{% else %}(pendiente){% endif %}"
+                      readonly
+                    />
                   </div>
 
                   <div class="col-12">
@@ -171,6 +186,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     />
                   </div>
                   <div class="col-1" style="display: flex; align-items: end">
+                    {% if not view_only %}
                     <button
                       class="btn btn--ghost"
                       type="button"
@@ -179,6 +195,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     >
                       🔎
                     </button>
+                    {% endif %}
                   </div>
                   <div class="col-4">
                     <label class="muted">Nombre Vendedor</label>
@@ -220,6 +237,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     class="col-1"
                     style="display: flex; align-items: end; gap: 8px"
                   >
+                    {% if not view_only %}
                     <button
                       class="btn btn--ghost"
                       type="button"
@@ -228,6 +246,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     >
                       🔎
                     </button>
+                    {% endif %}
                   </div>
                   <div class="col-5">
                     <label class="muted">Nombre</label>
@@ -264,6 +283,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                       type="submit"
                       name="action"
                       value="agregar_item"
+                      {% if view_only %}disabled{% endif %}
                     >
                       Agregar
                     </button>
@@ -271,6 +291,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                       class="btn btn--ghost"
                       type="button"
                       onclick="openVisorPrecios()"
+                      {% if view_only %}disabled{% endif %}
                     >
                       Visor
                     </button>
@@ -301,6 +322,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                       <td style="text-align: right">{{ it.desc }}</td>
                       <td style="text-align: right">{{ it.total }}</td>
                       <td style="text-align: right">
+                        {% if not view_only %}
                         <form
                           method="post"
                           action="/facturacion/factura/nueva"
@@ -325,6 +347,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                             Eliminar
                           </button>
                         </form>
+                        {% endif %}
                       </td>
                     </tr>
                     {% else %}
@@ -384,6 +407,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                         type="button"
                         onclick="openLookup('bancos')"
                         title="Buscar banco"
+                        {% if view_only %}disabled{% endif %}
                       >
                         🔎
                       </button>
@@ -402,13 +426,15 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     class="col-6"
                     style="display: flex; align-items: end; gap: 8px"
                   >
-                    <button class="btn" type="submit">Agregar</button>
+                    <button class="btn" type="submit" {% if view_only %}disabled{% endif %}>Agregar</button>
+                    {% if not view_only %}
                     <a
                       class="btn btn--ghost"
                       href="#"
                       onclick="document.getElementById('btnLimpiar').click(); return false;"
                       >Limpiar</a
                     >
+                    {% endif %}
                   </div>
                 </form>
 
@@ -432,6 +458,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                       <td>{{ p.modo }}</td>
                       <td style="text-align: right">{{ p.monto }}</td>
                       <td style="text-align: right">
+                        {% if not view_only %}
                         <form
                           method="post"
                           action="/facturacion/factura/nueva"
@@ -456,6 +483,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                             Eliminar
                           </button>
                         </form>
+                        {% endif %}
                       </td>
                     </tr>
                     {% else %}
@@ -483,7 +511,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                   </div>
                   <div class="col-6"><span class="muted">Pagado</span></div>
                   <div class="col-6" style="text-align: right">
-                    <b>{{ inv["totales"]["pagado"] }}</b>
+                    <b style="color: #ff4d4d">{{ inv["totales"]["pagado"] }}</b>
                   </div>
                   <div class="col-6"><span class="muted">Cambio</span></div>
                   <div class="col-6" style="text-align: right">
@@ -522,10 +550,12 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 
                 <div class="toolbar" style="margin-top: 12px">
                   <div class="toolbar__left">
+                    {% if not view_only %}
                     <form method="post" action="/facturacion/factura/confirmar" style="display: inline">
                       <button class="btn btn--ghost" type="submit" name="print" value="0">Guardar (sin imprimir)</button>
                       <button class="btn btn--ghost" type="submit" name="print" value="1">Guardar e Imprimir</button>
                     </form>
+                    {% endif %}
                     <a
                       class="btn btn--ghost"
                       href="/facturacion/facturas?tipdoc={{ tipdoc }}"
@@ -533,6 +563,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     >
                   </div>
                   <div class="toolbar__right">
+                    {% if not view_only %}
                     <form
                       method="post"
                       action="/facturacion/factura/nueva"
@@ -548,6 +579,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                         Cancelar Documento
                       </button>
                     </form>
+                    {% endif %}
                   </div>
                 </div>
 
@@ -624,6 +656,43 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
     </div>
   </div>
 </div>
+
+{% if view_only %}
+<script>
+  (function () {
+    try {
+      var root = document.querySelector('.factura-shell');
+      if (!root) return;
+      // Bloquear submits para que nada se pueda editar/enviar.
+      var forms = root.querySelectorAll('form');
+      for (var f = 0; f < forms.length; f++) {
+        forms[f].addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          return false;
+        });
+      }
+
+      // Mantener inputs visibles (no disabled), pero no editables.
+      var inputs = root.querySelectorAll('input, textarea');
+      for (var i = 0; i < inputs.length; i++) {
+        var el = inputs[i];
+        if (el && el.type === 'hidden') continue;
+        el.readOnly = true;
+      }
+
+      // Selects y botones sí van deshabilitados.
+      var selects = root.querySelectorAll('select');
+      for (var s = 0; s < selects.length; s++) {
+        selects[s].disabled = true;
+      }
+      var buttons = root.querySelectorAll('button');
+      for (var b = 0; b < buttons.length; b++) {
+        buttons[b].disabled = true;
+      }
+    } catch (e) {}
+  })();
+</script>
+{% endif %}
 {% endblock %} {% block extra_scripts %}
 <script>
   let lookupType = null;

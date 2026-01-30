@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block sidebar %}{% include "_sidebar.html" %}{% endblock %}
+
+{% block content %}
+<div class="grid">
+  <div class="col-12">
+    <div class="card">
+      <div class="card__title">{{ page_title }}</div>
+      <div class="card__body">
+        {% if error %}
+        <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        {% if header %}
+        <div class="toolbar" style="margin-bottom: 10px">
+          <div class="toolbar__left">
+            <span class="badge">Tipo: {{ header.dcli_tipdoc or tipdoc }}</span>
+            <span class="badge">Número: {{ header.dcli_numero }}</span>
+            <span class="badge">Cliente: {{ header.dcli_codigo }} - {{ header.cli_nombre }}</span>
+          </div>
+          <div class="toolbar__right">
+            {% if header.dcli_fecha %}<span class="badge">Fecha: {{ header.dcli_fecha }}</span>{% endif %}
+            {% if header.dcli_estado %}<span class="badge">Estado: {{ header.dcli_estado }}</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="grid" style="gap: 10px">
+          <div class="col-6">
+            <div class="card">
+              <div class="card__title" style="font-size: 13px">Totales</div>
+              <div class="card__body">
+                <table class="table" style="margin: 0">
+                  <tbody>
+                    {% if header.dcli_baseneta is defined %}
+                    <tr>
+                      <td class="muted">Base</td>
+                      <td style="text-align:right">{{ header.dcli_baseneta }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_iva is defined %}
+                    <tr>
+                      <td class="muted">IVA</td>
+                      <td style="text-align:right">{{ header.dcli_iva }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_desc is defined %}
+                    <tr>
+                      <td class="muted">Desc</td>
+                      <td style="text-align:right">{{ header.dcli_desc }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_neto is defined %}
+                    <tr>
+                      <td class="muted">Neto</td>
+                      <td style="text-align:right">{{ header.dcli_neto }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_total is defined %}
+                    <tr>
+                      <td class="muted">Total</td>
+                      <td style="text-align:right">{{ header.dcli_total }}</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-6">
+            <div class="card">
+              <div class="card__title" style="font-size: 13px">Fiscal / Referencia</div>
+              <div class="card__body">
+                <table class="table" style="margin: 0">
+                  <tbody>
+                    <tr>
+                      <td class="muted">Fiscal</td>
+                      <td>{{ header.dcli_numfis or '' }}</td>
+                    </tr>
+                    {% if header.dcli_serfis is defined %}
+                    <tr>
+                      <td class="muted">Serial</td>
+                      <td>{{ header.dcli_serfis }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_impfis is defined %}
+                    <tr>
+                      <td class="muted">Imp. Fiscal</td>
+                      <td>{{ header.dcli_impfis }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_facafe is defined %}
+                    <tr>
+                      <td class="muted">Afecta</td>
+                      <td>{{ header.dcli_facafe }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_vendedor is defined %}
+                    <tr>
+                      <td class="muted">Vendedor</td>
+                      <td>{{ header.dcli_vendedor }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_caja is defined %}
+                    <tr>
+                      <td class="muted">Caja</td>
+                      <td>{{ header.dcli_caja }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if header.dcli_condic is defined %}
+                    <tr>
+                      <td class="muted">Condición</td>
+                      <td>{{ header.dcli_condic }}</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 10px">
+          <div class="card__title" style="font-size: 13px">Items</div>
+          <div class="card__body">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th>Und</th>
+                  <th style="text-align:right">Cant</th>
+                  <th style="text-align:right">Desc</th>
+                  <th style="text-align:right">Precio</th>
+                  <th style="text-align:right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in items %}
+                <tr>
+                  <td>{{ it.mov_item }}</td>
+                  <td>{{ it.mov_codigo }}</td>
+                  <td>{{ it.colProducto }}</td>
+                  <td>{{ it.mov_undmed }}</td>
+                  <td style="text-align:right">{{ it.mov_cant }}</td>
+                  <td style="text-align:right">{{ it.mov_desc }}</td>
+                  <td style="text-align:right">{{ it.mov_precio }}</td>
+                  <td style="text-align:right">{{ it.mov_total }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="8" class="muted">Sin items.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 10px">
+          <div class="card__title" style="font-size: 13px">Pagos</div>
+          <div class="card__body">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Forma</th>
+                  <th>Banco</th>
+                  <th>Referencia</th>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th style="text-align:right">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in pagos %}
+                <tr>
+                  <td>{{ p.movc_numtra }}</td>
+                  <td>{{ p.movc_forpag or p.mocv_forpag }}</td>
+                  <td>{{ p.movc_tipoctaban }}</td>
+                  <td>{{ p.movc_numero }}</td>
+                  <td>{{ p.movc_fchemision }}</td>
+                  <td>{{ p.movc_hora }}</td>
+                  <td style="text-align:right">{{ p.movc_monto }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="7" class="muted">Sin pagos.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {% else %}
+        <div class="code">Documento: {{ numero }} | Cliente: {{ codigo }} | Tipo: {{ tipdoc or 'N/D' }}</div>
+        {% endif %}
+
+        <div class="actions" style="margin-top: 12px">
+          <a class="btn btn--ghost" href="/facturacion/facturas?tipdoc={{ tipdoc or 'FAV' }}">Volver</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

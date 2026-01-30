@@ -1062,23 +1062,192 @@ def facturacion_facturas_ver(
     request: Request,
     numero: str | None = Query(None),
     codigo: str | None = Query(None),
+    tipdoc: str | None = Query(None),
 ):
     user, redirect = _require_user(request)
     if redirect:
         return redirect
     menu = _load_menu(user)
+
+    from decimal import Decimal, InvalidOperation
+
+    def _d(v: object, default: Decimal = Decimal("0")) -> Decimal:
+        if v is None:
+            return default
+        s = str(v).strip()
+        if not s:
+            return default
+        s = s.replace(".", "").replace(",", ".") if s.count(",") == 1 and s.count(".") >= 1 else s.replace(",", ".")
+        try:
+            return Decimal(s)
+        except InvalidOperation:
+            return default
+
+    def _fmt2(v: Decimal) -> str:
+        return f"{v:.2f}"
+
+    numero_s = (numero or "").strip()
+    codigo_s = (codigo or "").strip()
+    tipdoc_s = (tipdoc or "").strip().upper() or ""
+    if tipdoc_s not in {"FAV", "DEV", "NDE"}:
+        tipdoc_s = ""
+
+    header: dict | None = None
+    items: list[dict] = []
+    pagos_rows: list[dict] = []
+    error: str | None = None
+
+    if not numero_s or not codigo_s:
+        error = "Debe indicar número y cliente (código) para ver el documento."
+        tipdoc_eff = tipdoc_s or "FAV"
+    else:
+        try:
+            repo = FacturacionRepository()
+            header = repo.get_documento_header(numero=numero_s, codigo=codigo_s)
+            tipdoc_eff = tipdoc_s or str((header or {}).get("dcli_tipdoc") or "").strip().upper() or "FAV"
+            if tipdoc_eff not in {"FAV", "DEV", "NDE"}:
+                tipdoc_eff = "FAV"
+            items = repo.list_items_documento(numero=numero_s, codigo=codigo_s, tipdoc=tipdoc_eff)
+            pagos_rows = repo.list_pagos_documento(numero=numero_s, codigo=codigo_s)
+        except DatabaseUnavailable as e:
+            error = str(e)
+            tipdoc_eff = tipdoc_s or "FAV"
+        except Exception as e:
+            error = str(e)
+            tipdoc_eff = tipdoc_s or "FAV"
+
+    inv = invoice_default(tipdoc_eff)
+    inv["tipdoc"] = tipdoc_eff
+    inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
+
+    if header:
+        inv["numero"] = str(header.get("dcli_numero") or numero_s)
+        inv["fecha"] = str(header.get("dcli_fecha") or "") or inv.get("fecha")
+        inv["obs"] = str(header.get("dcli_observa") or "")
+        inv["numfis"] = str(header.get("dcli_numfis") or "")
+
+    # Cliente
+    try:
+        cli_row = ClientesRepository().get_cliente(codigo=codigo_s) if codigo_s else None
+    except Exception:
+        cli_row = None
+    inv["cliente"] = {
+        "codigo": codigo_s,
+        "rif": str((cli_row or {}).get("cli_rif") or ""),
+        "nombre": str((cli_row or {}).get("cli_nombre") or (header or {}).get("cli_nombre") or ""),
+        "direccion": str((cli_row or {}).get("cli_direcc") or ""),
+    }
+
+    # Vendedor
+    vend_codigo = str((header or {}).get("dcli_vendedor") or "").strip()
+    if not vend_codigo:
+        for it in items or []:
+            vend_codigo = str(it.get("mov_vendedor") or "").strip()
+            if vend_codigo:
+                break
+    vend_codigo = zpad(vend_codigo, 10) if vend_codigo else ""
+    try:
+        vend_row = VendedoresRepository().get_vendedor(codigo=vend_codigo) if vend_codigo else None
+    except Exception:
+        vend_row = None
+    inv["vendedor"] = {
+        "codigo": vend_codigo,
+        "nombre": str((vend_row or {}).get("ven_nombre") or ""),
+    }
+
+    # Items
+    inv_items: list[dict] = []
+    total_prod = Decimal("0")
+    for r in items or []:
+        qty = _d(r.get("mov_cant"), Decimal("0"))
+        total_prod += qty
+        inv_items.append(
+            {
+                "codigo": str(r.get("mov_codigo") or ""),
+                "nombre": str(r.get("colProducto") or ""),
+                "unidad": str(r.get("mov_undmed") or ""),
+                "cantidad": _fmt2(qty),
+                "precio": str(r.get("mov_precio") or "0.00"),
+                "desc": str(r.get("mov_desc") or "0.00"),
+                "total": str(r.get("mov_total") or "0.00"),
+                "exento": "",
+                "iva_tipo": "",
+                "iva_pct": "0.00",
+                "iva": "0.000000",
+            }
+        )
+    inv["items"] = inv_items
+
+    # Pagos (excluimos CAMBIO del listado; lo mostramos en totales)
+    inv_pagos: list[dict] = []
+    pagado = Decimal("0")
+    efectivo = Decimal("0")
+    cheques = Decimal("0")
+    tarjetas = Decimal("0")
+    cambio = Decimal("0")
+
+    for p in pagos_rows or []:
+        modo = str(p.get("movc_forpag") or p.get("mocv_forpag") or "").strip()
+        monto = _d(p.get("movc_monto"), Decimal("0"))
+        if modo.upper() == "CAMBIO":
+            cambio += monto
+            continue
+        inv_pagos.append(
+            {
+                "modo": modo,
+                "banco": str(p.get("movc_tipoctaban") or ""),
+                "referencia": str(p.get("movc_numero") or ""),
+                "monto": _fmt2(monto),
+            }
+        )
+        pagado += monto
+        ml = modo.lower()
+        if "efectivo" in ml:
+            efectivo += monto
+        elif "cheque" in ml:
+            cheques += monto
+        elif "tarjeta" in ml:
+            tarjetas += monto
+
+    inv["pagos"] = inv_pagos
+
+    # Totales preferimos los del header (para no recalcular con IVA desconocido)
+    des_items = _d((header or {}).get("dcli_desc"), Decimal("0"))
+    base = _d((header or {}).get("dcli_baseneta"), Decimal("0"))
+    iva = _d((header or {}).get("dcli_iva"), Decimal("0"))
+    neto = _d((header or {}).get("dcli_neto"), base + iva)
+    subtotal = base + des_items
+
+    inv["totales"] = {
+        "subtotal": _fmt2(subtotal),
+        "des_items": _fmt2(des_items),
+        "base": _fmt2(base),
+        "total_prod": _fmt2(total_prod),
+        "iva": _fmt2(iva),
+        "neto": _fmt2(neto),
+        "pagado": _fmt2(pagado),
+        "cambio": _fmt2(cambio),
+        "efectivo": _fmt2(efectivo),
+        "cheques": _fmt2(cheques),
+        "tarjetas": _fmt2(tarjetas),
+    }
+
+    titulo_doc = "Factura de Venta" if tipdoc_eff == "FAV" else ("Devolución" if tipdoc_eff == "DEV" else "Nota de Débito")
+    message = error
+
     return templates.TemplateResponse(
-        "facturacion/factura_stub.html",
+        "facturacion/frm_factura.html",
         {
             "request": request,
             "user": user,
             "menu": menu,
             "active_href": "/facturacion/facturas",
-            "title": "Ver Documento - Lebrun",
-            "page_title": "Ver Documento",
-            "message": "Stub: ver detalle del documento (cabecera + items).",
-            "numero": numero,
-            "codigo": codigo,
+            "title": f"Ver Documento - {titulo_doc} - Lebrun",
+            "page_title": f"Ver Documento - {titulo_doc}",
+            "message": message,
+            "inv": inv,
+            "hide_topbar": True,
+            "view_only": True,
         },
     )
 
