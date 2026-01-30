@@ -151,5 +151,49 @@
       "db_update_error": "(pymysql.err.OperationalError) (2003, \"Can't connect to MySQL server on '127.0.0.1' ([WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión)\")\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
     },
     "error": null
+  },
+  {
+    "id": "6b677046595d481880ae5d0642b5823a",
+    "created_at": "2026-01-30T21:40:33Z",
+    "status": "processing",
+    "caja": "TEST",
+    "job_type": "PRINT_DOC",
+    "payload": {
+      "invoice_id": "",
+      "table": "admdoccli",
+      "doc_numero": "000000114805",
+      "requested_by": "stub",
+      "tipdoc": "FAV"
+    },
+    "result": null,
+    "error": null
+  },
+  {
+    "id": "b614d7ce4bd64a37a0dd196a6d60b5eb",
+    "created_at": "2026-01-30T21:42:39Z",
+    "status": "completed",
+    "caja": "TEST",
+    "job_type": "PRINT_DOC",
+    "payload": {
+      "invoice_id": "",
+      "table": "admdoccli",
+      "doc_numero": "000000114805",
+      "requested_by": "stub",
+      "tipdoc": "FAV"
+    },
+    "result": {
+      "last_credit_note_number": "21044623",
+      "invoice_id": "",
+      "printed": true,
+      "last_invoice_number": "21044623",
+      "last_debit_note_number": "21044623",
+      "doc_numero": "000000114805",
+      "tipdoc": "FAV",
+      "registered_machine_number": "STUBMACH",
+      "daily_closure_counter": "0",
+      "db_update_ok": false,
+      "db_update_error": "(pymysql.err.OperationalError) (2003, \"Can't connect to MySQL server on '127.0.0.1' ([WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión)\")\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+    },
+    "error": null
   }
 ]
