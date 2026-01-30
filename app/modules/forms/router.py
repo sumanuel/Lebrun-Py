@@ -195,6 +195,59 @@ def facturacion_facturas(
     )
 
 
+@router.get("/facturacion/facturas/devolucion")
+def facturacion_facturas_devolucion(
+    request: Request,
+    numero: str = Query(""),
+    codigo: str = Query(""),
+):
+    """Flujo WinForms: botón 'Devolución' desde la lista de facturas (FAV).
+
+    Validaciones (WinForms):
+    - La factura debe estar impresa
+    - Debe tener número fiscal
+    - No debe estar exportada
+    """
+
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    numero = (numero or "").strip()
+    codigo = (codigo or "").strip()
+    if not numero or not codigo:
+        request.session["flash"] = "Debe indicar Número y Cliente para la devolución."
+        return RedirectResponse(url="/facturacion/facturas?tipdoc=FAV", status_code=303)
+
+    try:
+        ref = FacturacionRepository().get_documento_header(numero=numero, codigo=codigo)
+    except DatabaseUnavailable as e:
+        request.session["flash"] = str(e)
+        return RedirectResponse(url="/facturacion/facturas?tipdoc=FAV", status_code=303)
+
+    if not ref:
+        request.session["flash"] = "Factura no encontrada."
+        return RedirectResponse(url="/facturacion/facturas?tipdoc=FAV", status_code=303)
+
+    impreso = str(ref.get("dcli_impreso") or "").strip().lower()
+    numfis = str(ref.get("dcli_numfis") or "").strip()
+    exportado = str(ref.get("dcli_expexp") or "").strip().lower()
+
+    is_impresa = impreso in {"1", "true", "t", "si", "sí", "s", "y", "yes"}
+    is_exportada = exportado == "exportado"
+
+    if not is_impresa or not numfis or is_exportada:
+        request.session["flash"] = (
+            "La factura debe estar impresa, tener número fiscal y no estar exportada para poder hacer la devolución."
+        )
+        return RedirectResponse(url="/facturacion/facturas?tipdoc=FAV", status_code=303)
+
+    return RedirectResponse(
+        url=f"/facturacion/importar-devolucion?ref_numero={numero}&ref_codigo={codigo}",
+        status_code=303,
+    )
+
+
 @router.get("/ventas/visor-precios", response_class=HTMLResponse)
 def ventas_visor_precios(
     request: Request,
@@ -607,6 +660,7 @@ def facturacion_importar_devolucion_post(
                 "codigo": ref_codigo_s,
                 "numfis": str((state.get("ref") or {}).get("numfis") or ""),
             }
+            inv["afectada_locked"] = True
 
             for r in state.get("reversados") or []:
                 add_item(
@@ -723,6 +777,34 @@ def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
     )
 
 
+@router.get("/facturacion/documento/nuevo")
+def facturacion_documento_nuevo(request: Request, tipdoc: str = Query("FAV")):
+    """Crea un documento nuevo y abre la pantalla de factura.
+
+    Paridad WinForms:
+    - Para DEV/NDE (desde los listados), el botón Agregar pide clave de supervisor.
+    """
+
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    tipdoc = (tipdoc or "FAV").strip().upper() or "FAV"
+    if tipdoc not in {"FAV", "DEV", "NDE"}:
+        tipdoc = "FAV"
+
+    if tipdoc in {"DEV", "NDE"}:
+        if not request.session.get("factura_supervisor_ok"):
+            next_url = f"/facturacion/documento/nuevo?tipdoc={tipdoc}"
+            return RedirectResponse(url=f"/facturacion/clave-confirmacion?scope=factura&next={next_url}", status_code=303)
+        request.session.pop("factura_supervisor_ok", None)
+        request.session.pop("factura_supervisor_user", None)
+
+    request.session["factura"] = invoice_default(tipdoc)
+    request.session["flash"] = "Documento preparado."
+    return RedirectResponse(url=f"/facturacion/factura/nueva?tipdoc={tipdoc}", status_code=303)
+
+
 @router.post("/facturacion/factura/nueva", response_class=HTMLResponse)
 def facturacion_factura_nueva_post(
     request: Request,
@@ -730,6 +812,9 @@ def facturacion_factura_nueva_post(
     action: str = Form(""),
     # cliente
     cli_codigo: str = Form(""),
+    # factura afectada (DEV/NDE)
+    afect_numero: str = Form(""),
+    afect_numfis: str = Form(""),
     # vendedor
     vend_codigo: str = Form(""),
     # producto
@@ -760,11 +845,49 @@ def facturacion_factura_nueva_post(
         inv = invoice_default(tipdoc)
     inv["tipdoc"] = tipdoc
     inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
+    inv.setdefault("afectada", {"numero": "", "codigo": "", "numfis": ""})
+    inv.setdefault("afectada_locked", False)
+
+    # Persistir en sesión lo que el usuario teclee (solo si aplica y no viene bloqueado por importación).
+    if tipdoc in {"DEV", "NDE"} and not bool(inv.get("afectada_locked")):
+        if (afect_numero or "").strip() or (afect_numfis or "").strip():
+            inv["afectada"] = {
+                "numero": (afect_numero or "").strip(),
+                "codigo": (cli_codigo or "").strip(),
+                "numfis": (afect_numfis or "").strip(),
+            }
 
     action = (action or "").strip().lower()
     message: str | None = None
 
     try:
+        if action == "buscar_afectada":
+            if tipdoc not in {"DEV", "NDE"}:
+                message = "Acción inválida para este documento."
+            elif bool(inv.get("afectada_locked")):
+                message = "La factura afectada está bloqueada (proviene de importación)."
+            else:
+                num = (afect_numero or "").strip()
+                cli = (cli_codigo or "").strip()
+                if not num or not cli:
+                    message = "Indique Cliente y Núm. Factura afectada."
+                else:
+                    ref = FacturacionRepository().get_documento_header(numero=num, codigo=cli)
+                    if not ref:
+                        message = "No se encontró la factura afectada con esos datos."
+                    else:
+                        # Validación estilo WinForms (para devoluciones): impresa + fiscal + no exportada.
+                        impreso = str(ref.get("dcli_impreso") or "").strip().lower()
+                        numfis_db = str(ref.get("dcli_numfis") or "").strip()
+                        exportado = str(ref.get("dcli_expexp") or "").strip().lower()
+                        is_impresa = impreso in {"1", "true", "t", "si", "sí", "s", "y", "yes"}
+                        is_exportada = exportado == "exportado"
+
+                        if not is_impresa or not numfis_db or is_exportada:
+                            message = "La factura afectada debe estar impresa, tener fiscal y no estar exportada."
+
+                        inv["afectada"] = {"numero": num, "codigo": cli, "numfis": numfis_db}
+
         if action == "buscar_cliente":
             cli_codigo = (cli_codigo or "").strip()
             if not cli_codigo:
@@ -905,6 +1028,16 @@ def _validate_factura_ready(inv: dict) -> str | None:
     cli_codigo = str((inv.get("cliente") or {}).get("codigo") or "").strip()
     if not cli_codigo:
         return "Debe Seleccionar un cliente."
+
+    tipdoc = str(inv.get("tipdoc") or "FAV").strip().upper() or "FAV"
+    if tipdoc in {"DEV", "NDE"}:
+        af = inv.get("afectada") or {}
+        facafe = str(af.get("numero") or "").strip()
+        numfis = str(af.get("numfis") or "").strip()
+        if not facafe:
+            return "Debe indicar la Factura Afectada (Núm. Fac)."
+        if not numfis:
+            return "Debe indicar el Fiscal de la Factura Afectada."
     return None
 
 

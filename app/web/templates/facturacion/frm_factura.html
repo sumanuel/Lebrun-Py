@@ -208,6 +208,57 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                     />
                   </div>
 
+                  {% if tipdoc in ['DEV','NDE'] %}
+                  {% set af = (inv.get('afectada') if inv else {}) or {} %}
+                  {% set af_locked = (inv.get('afectada_locked') if inv else False) or False %}
+
+                  <div class="col-4">
+                    <label class="muted">Núm. Fac Afectada</label>
+                    <input
+                      id="afect_numero"
+                      class="input"
+                      name="afect_numero"
+                      value="{{ af.get('numero','') }}"
+                      placeholder="Número"
+                      autocomplete="off"
+                      {% if view_only or af_locked %}readonly{% endif %}
+                    />
+                  </div>
+                  <div class="col-1" style="display: flex; align-items: end">
+                    {% if not view_only and not af_locked %}
+                    <button
+                      class="btn btn--ghost"
+                      type="button"
+                      title="Buscar Factura Afectada"
+                      onclick="submitAction(document.getElementById('formDatos'), 'buscar_afectada')"
+                    >
+                      🔄
+                    </button>
+                    {% endif %}
+                  </div>
+                  <div class="col-4">
+                    <label class="muted">Fiscal Afectada</label>
+                    <input
+                      id="afect_numfis"
+                      class="input"
+                      name="afect_numfis"
+                      value="{{ af.get('numfis','') }}"
+                      placeholder="Núm Fiscal"
+                      autocomplete="off"
+                      {% if view_only or af_locked %}readonly{% endif %}
+                    />
+                  </div>
+                  <div class="col-3">
+                    <label class="muted">Referencia</label>
+                    <input
+                      class="input"
+                      value="{{ af.get('codigo','') }}"
+                      placeholder="(cliente)"
+                      readonly
+                    />
+                  </div>
+                  {% endif %}
+
                   
                 </form>
               </div>
@@ -973,6 +1024,21 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
         );
       }
     });
+
+    const afectN = document.getElementById("afect_numero");
+    if (afectN) {
+      afectN.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitAction(document.getElementById("formDatos"), "buscar_afectada");
+        }
+      });
+      afectN.addEventListener("blur", () => {
+        const num = String(afectN.value || "").trim();
+        const fiscal = String((document.getElementById("afect_numfis") || {}).value || "").trim();
+        if (num && !fiscal) submitAction(document.getElementById("formDatos"), "buscar_afectada");
+      });
+    }
   });
 </script>
 {% endblock %}
