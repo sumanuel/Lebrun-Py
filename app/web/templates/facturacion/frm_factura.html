@@ -67,6 +67,7 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
 {% endblock %} {% block content %} {% set tipdoc = inv["tipdoc"] if inv else
 'FAV' %} {% set titulo_doc = 'Factura de Venta' if tipdoc=='FAV' else
 ('Devolución de Venta' if tipdoc=='DEV' else 'Nota de Débito') %} {% set pago_form = (inv.get('pago_form') if inv else {}) or {} %}
+{% set cli_locked = (inv.get('cliente_locked') if inv else False) or False %}
 
 <div class="grid">
   <div class="col-12">
@@ -121,10 +122,11 @@ sidebar %}{% include "_sidebar.html" %}{% endblock %} {% block extra_head %}
                       value="{{ inv["cliente"]["codigo"] }}"
                       placeholder="Código"
                       autocomplete="off"
+                      {% if (tipdoc in ['DEV','NDE'] and cli_locked and not view_only) %}readonly{% endif %}
                     />
                   </div>
                   <div class="col-1" style="display: flex; align-items: end">
-                    {% if not view_only %}
+                    {% if not view_only and not (tipdoc in ['DEV','NDE'] and cli_locked) %}
                     <button
                       class="btn btn--ghost"
                       type="button"

@@ -43,6 +43,7 @@ def invoice_default(tipdoc: str = "FAV") -> dict:
         "tipdoc": (tipdoc or "FAV").strip().upper() or "FAV",
         "fecha": date.today().isoformat(),
         "cliente": {"codigo": "", "rif": "", "nombre": "", "direccion": ""},
+        "cliente_locked": False,
         "vendedor": {"codigo": "", "nombre": ""},
         "afectada": {"numero": "", "codigo": "", "numfis": ""},
         "afectada_locked": False,

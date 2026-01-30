@@ -756,6 +756,9 @@ def facturacion_factura_nueva(request: Request, tipdoc: str = Query("FAV")):
         inv = invoice_default(tipdoc)
     inv["tipdoc"] = tipdoc
     inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
+    inv.setdefault("cliente_locked", False)
+    inv.setdefault("afectada", {"numero": "", "codigo": "", "numfis": ""})
+    inv.setdefault("afectada_locked", False)
     recalc(inv)
     request.session["factura"] = inv
 
@@ -847,6 +850,7 @@ def facturacion_factura_nueva_post(
     inv.setdefault("pago_form", {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""})
     inv.setdefault("afectada", {"numero": "", "codigo": "", "numfis": ""})
     inv.setdefault("afectada_locked", False)
+    inv.setdefault("cliente_locked", False)
 
     # Persistir en sesión lo que el usuario teclee (solo si aplica y no viene bloqueado por importación).
     if tipdoc in {"DEV", "NDE"} and not bool(inv.get("afectada_locked")):
@@ -888,21 +892,35 @@ def facturacion_factura_nueva_post(
 
                         inv["afectada"] = {"numero": num, "codigo": cli, "numfis": numfis_db}
 
+                        # Paridad WinForms: al seleccionar la afectada, el cliente queda asociado/bloqueado.
+                        cli_row = ClientesRepository().get_cliente(codigo=cli)
+                        if cli_row:
+                            inv["cliente"] = {
+                                "codigo": str(cli_row.get("cli_codigo") or ""),
+                                "rif": str(cli_row.get("cli_rif") or ""),
+                                "nombre": str(cli_row.get("cli_nombre") or ""),
+                                "direccion": str(cli_row.get("cli_direcc") or ""),
+                            }
+                        inv["cliente_locked"] = True
+
         if action == "buscar_cliente":
-            cli_codigo = (cli_codigo or "").strip()
-            if not cli_codigo:
-                message = "Indique un código de cliente."
+            if tipdoc in {"DEV", "NDE"} and bool(inv.get("cliente_locked")):
+                message = "El cliente está bloqueado por la Factura Afectada. Use Limpiar para reiniciar."
             else:
-                row = ClientesRepository().get_cliente(codigo=cli_codigo)
-                if not row:
-                    message = f"Cliente no encontrado: {cli_codigo}"
+                cli_codigo = (cli_codigo or "").strip()
+                if not cli_codigo:
+                    message = "Indique un código de cliente."
                 else:
-                    inv["cliente"] = {
-                        "codigo": str(row.get("cli_codigo") or ""),
-                        "rif": str(row.get("cli_rif") or ""),
-                        "nombre": str(row.get("cli_nombre") or ""),
-                        "direccion": str(row.get("cli_direcc") or ""),
-                    }
+                    row = ClientesRepository().get_cliente(codigo=cli_codigo)
+                    if not row:
+                        message = f"Cliente no encontrado: {cli_codigo}"
+                    else:
+                        inv["cliente"] = {
+                            "codigo": str(row.get("cli_codigo") or ""),
+                            "rif": str(row.get("cli_rif") or ""),
+                            "nombre": str(row.get("cli_nombre") or ""),
+                            "direccion": str(row.get("cli_direcc") or ""),
+                        }
         elif action == "buscar_vendedor":
             vend_codigo = zpad((vend_codigo or "").strip(), 10)
             if not vend_codigo:
@@ -1002,6 +1020,8 @@ def facturacion_factura_nueva_post(
             inv = clear_invoice(inv)
             inv["tipdoc"] = tipdoc
             inv["pago_form"] = {"modo": "Efectivo", "banco": "", "ref": "", "monto": ""}
+            inv["cliente_locked"] = False
+            inv["afectada_locked"] = False
         else:
             # action vacío o no soportado: no hacer nada
             pass
