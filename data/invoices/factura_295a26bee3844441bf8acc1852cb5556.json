@@ -1,0 +1,75 @@
+{
+  "id": "295a26bee3844441bf8acc1852cb5556",
+  "saved_at": "2026-01-30T18:12:39",
+  "user": {
+    "username": "caja1",
+    "caja": "0001",
+    "empresa": "01"
+  },
+  "doc_numero": "000000114807",
+  "invoice": {
+    "tipdoc": "FAV",
+    "fecha": "2026-01-30",
+    "cliente": {
+      "codigo": "E 84429260",
+      "rif": "E 84429260",
+      "nombre": "PEDRO CARABALLO",
+      "direccion": ""
+    },
+    "vendedor": {
+      "codigo": "0000000012",
+      "nombre": "Yenny Gonzalez"
+    },
+    "obs": "",
+    "cambio_precio": false,
+    "producto": {
+      "codigo": "",
+      "nombre": "",
+      "unidad": "",
+      "cantidad": "1",
+      "precio": ""
+    },
+    "items": [
+      {
+        "codigo": "000000000010016",
+        "nombre": "ADAPTADOR SDS PLUS PWCH 20-105MM 2608584773-879",
+        "unidad": "PZA",
+        "exento": "",
+        "iva_tipo": "GN",
+        "iva_pct": "12.00",
+        "cantidad": "1.00",
+        "precio": "74.04",
+        "desc": "0.00",
+        "total": "74.04",
+        "iva": "8.884800"
+      }
+    ],
+    "pagos": [
+      {
+        "modo": "Efectivo",
+        "banco": "N/A",
+        "referencia": "N/A",
+        "monto": "82.92"
+      }
+    ],
+    "totales": {
+      "subtotal": "74.04",
+      "des_items": "0.00",
+      "base": "74.04",
+      "total_prod": "1.00",
+      "iva": "8.88",
+      "neto": "82.92",
+      "pagado": "82.92",
+      "cambio": "0.00",
+      "efectivo": "82.92",
+      "cheques": "0.00",
+      "tarjetas": "0.00"
+    },
+    "pago_form": {
+      "modo": "Efectivo",
+      "banco": "",
+      "ref": "",
+      "monto": ""
+    }
+  }
+}
